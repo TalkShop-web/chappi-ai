@@ -1,28 +1,10 @@
 import { useState, useMemo } from "react";
-import { Search, MessageSquare, Tag, ChevronRight, ChevronDown, FolderOpen, Plus, Settings } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Search, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface Chat {
-  id: string;
-  title: string;
-  preview: string;
-  date: string;
-  source: "ChatGPT" | "Claude" | "Gemini";
-  tags: string[];
-}
-
-interface TopicFolder {
-  name: string;
-  chats: Chat[];
-  summary: string;
-}
-
-interface AIService {
-  name: "ChatGPT" | "Claude" | "Gemini";
-  isConnected: boolean;
-  icon: string;
-}
+import { ServiceSettings } from "./chat/ServiceSettings";
+import { FolderView } from "./chat/FolderView";
+import { ChatDetail } from "./chat/ChatDetail";
+import { Chat, AIService } from "./chat/types";
 
 const aiServices: AIService[] = [
   {
@@ -104,18 +86,6 @@ export function ChatArchive() {
     )
   );
 
-  const toggleFolder = (folderName: string) => {
-    setExpandedFolders(prev => {
-      const next = new Set(prev);
-      if (next.has(folderName)) {
-        next.delete(folderName);
-      } else {
-        next.add(folderName);
-      }
-      return next;
-    });
-  };
-
   const handleConnectService = (serviceName: AIService["name"]) => {
     setServices(prev =>
       prev.map(service =>
@@ -148,6 +118,18 @@ export function ChatArchive() {
     });
   };
 
+  const toggleFolder = (folderName: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(folderName)) {
+        next.delete(folderName);
+      } else {
+        next.add(folderName);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="flex h-screen bg-background">
       <div className="w-80 border-r border-border bg-card p-4 flex flex-col">
@@ -163,139 +145,36 @@ export function ChatArchive() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="ml-2 p-2 rounded-lg hover:bg-accent"
-              title="Settings"
-            >
-              <Settings className="h-5 w-5" />
-            </button>
+            <ServiceSettings
+              services={services}
+              onServiceConnect={handleConnectService}
+              showSettings={showSettings}
+              onToggleSettings={() => setShowSettings(!showSettings)}
+            />
           </div>
-
-          {showSettings && (
-            <div className="p-4 rounded-lg border border-border bg-card">
-              <h3 className="text-sm font-medium mb-3">Connected Services</h3>
-              <div className="space-y-2">
-                {services.map((service) => (
-                  <button
-                    key={service.name}
-                    onClick={() => handleConnectService(service.name)}
-                    className={cn(
-                      "w-full flex items-center justify-between p-2 rounded-md text-sm",
-                      "transition-colors duration-200",
-                      service.isConnected
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary hover:bg-secondary/80"
-                    )}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>{service.icon}</span>
-                      {service.name}
-                    </span>
-                    <span className="text-xs">
-                      {service.isConnected ? "Connected" : "Connect"}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="flex-1 overflow-auto">
           {filteredFolders.map((folder) => (
-            <div key={folder.name} className="mb-4">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => toggleFolder(folder.name)}
-                  className="flex-1 flex items-center gap-2 p-2 rounded-lg hover:bg-accent text-sm font-medium"
-                >
-                  {expandedFolders.has(folder.name) ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                  <FolderOpen className="h-4 w-4" />
-                  <span>{folder.name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {folder.chats.length}
-                  </span>
-                </button>
-                <button
-                  onClick={() => handleCreateNewNote(folder.name)}
-                  className="p-2 rounded-lg hover:bg-accent"
-                  title={`Create new note about ${folder.name}`}
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-              
-              {expandedFolders.has(folder.name) && (
-                <div className="ml-6 mt-2 space-y-2">
-                  <p className="text-xs text-muted-foreground px-2">{folder.summary}</p>
-                  {folder.chats.map((chat) => (
-                    <div
-                      key={chat.id}
-                      onClick={() => setSelectedChat(chat)}
-                      className={cn(
-                        "p-3 rounded-lg cursor-pointer transition-all duration-200",
-                        "hover:bg-accent",
-                        selectedChat?.id === chat.id ? "bg-accent" : "bg-card"
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">{chat.title}</h3>
-                        <span className="text-xs text-muted-foreground">{chat.source}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2">{chat.preview}</p>
-                      <div className="flex gap-2 mt-2">
-                        {chat.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="px-2 py-1 text-xs rounded-full bg-secondary text-secondary-foreground"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <FolderView
+              key={folder.name}
+              folder={folder}
+              isExpanded={expandedFolders.has(folder.name)}
+              selectedChat={selectedChat}
+              onToggleFolder={toggleFolder}
+              onSelectChat={setSelectedChat}
+              onCreateNote={handleCreateNewNote}
+            />
           ))}
         </div>
       </div>
 
       <div className="flex-1 p-6">
         {selectedChat ? (
-          <div className="max-w-3xl mx-auto">
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h1 className="text-2xl font-semibold">{selectedChat.title}</h1>
-                <button
-                  onClick={() => handleCreateNewNote(selectedChat.tags[0], selectedChat)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>New Note</span>
-                </button>
-              </div>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <MessageSquare className="h-4 w-4" />
-                  {selectedChat.source}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Tag className="h-4 w-4" />
-                  {selectedChat.tags.join(", ")}
-                </span>
-              </div>
-            </div>
-            <div className="prose prose-sm max-w-none">
-              <p>{selectedChat.preview}</p>
-            </div>
-          </div>
+          <ChatDetail
+            chat={selectedChat}
+            onCreateNote={handleCreateNewNote}
+          />
         ) : (
           <div className="h-full flex items-center justify-center text-muted-foreground">
             <div className="text-center">

@@ -18,10 +18,10 @@ export function ServiceSettings({
 }: ServiceSettingsProps) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between w-full">
         <button
           onClick={onToggleSettings}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Settings className="h-4 w-4" />
           Integrations

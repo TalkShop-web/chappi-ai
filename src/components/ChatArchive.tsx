@@ -145,7 +145,7 @@ export function ChatArchive() {
   };
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex bg-background">
       <div className="w-80 border-r border-border bg-card p-4 flex flex-col">
         <div className="mb-6 space-y-4">
           <div className="flex flex-col space-y-4">

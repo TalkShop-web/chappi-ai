@@ -1,10 +1,11 @@
+
 import { useState, useMemo } from "react";
 import { Search, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ServiceSettings } from "./chat/ServiceSettings";
 import { FolderView } from "./chat/FolderView";
 import { ChatDetail } from "./chat/ChatDetail";
-import { Chat, AIService } from "./chat/types";
+import { Chat, AIService, TopicFolder } from "./chat/types";
 
 const aiServices: AIService[] = [
   {
@@ -34,7 +35,7 @@ const sampleChats: Chat[] = [
     tags: ["Technology", "Physics"]
   },
   {
-    id: "2",
+    id: "2", 
     title: "Creative Writing Tips",
     preview: "Exploring various techniques for creative writing...",
     date: "2024-03-19",

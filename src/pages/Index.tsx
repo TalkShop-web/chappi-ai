@@ -1,5 +1,6 @@
 
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { ChatArchive } from "@/components/ChatArchive";
 
 const Index = () => {
@@ -9,6 +10,7 @@ const Index = () => {
       <main className="flex-1">
         <ChatArchive />
       </main>
+      <Footer />
     </div>
   );
 };

@@ -1,13 +1,7 @@
 
 import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-
-export interface AIService {
-  name: "ChatGPT" | "Claude" | "Gemini";
-  isConnected: boolean;
-  icon: string;
-}
+import { AIService } from "./types";
 
 interface ServiceSettingsProps {
   services: AIService[];
@@ -27,10 +21,10 @@ export function ServiceSettings({
       <div className="flex items-center justify-between">
         <button
           onClick={onToggleSettings}
-          className="ml-2 p-2 rounded-lg hover:bg-accent"
-          title="Settings"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
-          <Settings className="h-5 w-5" />
+          <Settings className="h-4 w-4" />
+          Integrations
         </button>
       </div>
 

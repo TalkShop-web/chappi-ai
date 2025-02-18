@@ -4,7 +4,7 @@ export interface Chat {
   title: string;
   preview: string;
   date: string;
-  source: "ChatGPT" | "Claude" | "Gemini";
+  source: "ChatGPT" | "Claude" | "Gemini" | "Perplexity";
   tags: string[];
 }
 
@@ -15,7 +15,7 @@ export interface TopicFolder {
 }
 
 export interface AIService {
-  name: "ChatGPT" | "Claude" | "Gemini";
+  name: "ChatGPT" | "Claude" | "Gemini" | "Perplexity";
   isConnected: boolean;
   icon: string;
 }

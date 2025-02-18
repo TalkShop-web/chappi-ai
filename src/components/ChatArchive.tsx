@@ -1,6 +1,5 @@
-
 import { useState, useMemo } from "react";
-import { Search, MessageSquare } from "lucide-react";
+import { Search, MessageSquare, Brain } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ServiceSettings } from "./chat/ServiceSettings";
 import { FolderView } from "./chat/FolderView";
@@ -22,6 +21,11 @@ const aiServices: AIService[] = [
     name: "Gemini",
     isConnected: false,
     icon: "✨"
+  },
+  {
+    name: "Perplexity",
+    isConnected: false,
+    icon: "🔮"
   }
 ];
 
@@ -88,6 +92,15 @@ export function ChatArchive() {
   );
 
   const handleConnectService = (serviceName: AIService["name"]) => {
+    if (serviceName === "Perplexity") {
+      toast({
+        title: "Perplexity Connection",
+        description: "Please provide your Perplexity API key to connect.",
+      });
+      setShowSettings(true);
+      return;
+    }
+
     setServices(prev =>
       prev.map(service =>
         service.name === serviceName

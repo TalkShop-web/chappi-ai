@@ -10,7 +10,7 @@ export function Header() {
           <img 
             src="/lovable-uploads/fe93913a-8bf2-4312-b6ea-a1e624532cfd.png" 
             alt="Chappi.ai" 
-            className="h-6"
+            className="h-6 pl-5"
           />
         </Link>
 

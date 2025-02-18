@@ -1,6 +1,5 @@
-
 import { useState, useMemo } from "react";
-import { Search, MessageSquare, Tag, ChevronRight, ChevronDown, FolderOpen, Plus } from "lucide-react";
+import { Search, MessageSquare, Tag, ChevronRight, ChevronDown, FolderOpen, Plus, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,6 +17,30 @@ interface TopicFolder {
   chats: Chat[];
   summary: string;
 }
+
+interface AIService {
+  name: "ChatGPT" | "Claude" | "Gemini";
+  isConnected: boolean;
+  icon: string;
+}
+
+const aiServices: AIService[] = [
+  {
+    name: "ChatGPT",
+    isConnected: false,
+    icon: "🤖"
+  },
+  {
+    name: "Claude",
+    isConnected: false,
+    icon: "🧠"
+  },
+  {
+    name: "Gemini",
+    isConnected: false,
+    icon: "✨"
+  }
+];
 
 const sampleChats: Chat[] = [
   {
@@ -51,9 +74,10 @@ export function ChatArchive() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [showSettings, setShowSettings] = useState(false);
+  const [services, setServices] = useState<AIService[]>(aiServices);
   const { toast } = useToast();
 
-  // Group chats by tags and create topic folders
   const topicFolders = useMemo(() => {
     const folders: Record<string, TopicFolder> = {};
     
@@ -92,9 +116,32 @@ export function ChatArchive() {
     });
   };
 
+  const handleConnectService = (serviceName: AIService["name"]) => {
+    setServices(prev =>
+      prev.map(service =>
+        service.name === serviceName
+          ? { ...service, isConnected: !service.isConnected }
+          : service
+      )
+    );
+
+    toast({
+      title: "Service connection updated",
+      description: `${serviceName} has been ${services.find(s => s.name === serviceName)?.isConnected ? 'disconnected' : 'connected'}.`,
+    });
+  };
+
   const handleCreateNewNote = (topic: string, sourceChat?: Chat) => {
-    // Here we would typically make an API call to an AI service
-    // For now, we'll show a toast notification
+    if (!services.some(service => service.isConnected)) {
+      toast({
+        title: "No AI services connected",
+        description: "Please connect at least one AI service to create new notes.",
+        variant: "destructive"
+      });
+      setShowSettings(true);
+      return;
+    }
+
     toast({
       title: "Creating new note",
       description: `Expanding on ${topic}${sourceChat ? ` based on "${sourceChat.title}"` : ''}`,
@@ -103,19 +150,56 @@ export function ChatArchive() {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar */}
       <div className="w-80 border-r border-border bg-card p-4 flex flex-col">
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search conversations..."
-              className="w-full pl-9 pr-4 py-2 rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-shadow duration-200"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        <div className="mb-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                className="w-full pl-9 pr-4 py-2 rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-shadow duration-200"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="ml-2 p-2 rounded-lg hover:bg-accent"
+              title="Settings"
+            >
+              <Settings className="h-5 w-5" />
+            </button>
           </div>
+
+          {showSettings && (
+            <div className="p-4 rounded-lg border border-border bg-card">
+              <h3 className="text-sm font-medium mb-3">Connected Services</h3>
+              <div className="space-y-2">
+                {services.map((service) => (
+                  <button
+                    key={service.name}
+                    onClick={() => handleConnectService(service.name)}
+                    className={cn(
+                      "w-full flex items-center justify-between p-2 rounded-md text-sm",
+                      "transition-colors duration-200",
+                      service.isConnected
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary hover:bg-secondary/80"
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{service.icon}</span>
+                      {service.name}
+                    </span>
+                    <span className="text-xs">
+                      {service.isConnected ? "Connected" : "Connect"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-auto">
@@ -183,7 +267,6 @@ export function ChatArchive() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 p-6">
         {selectedChat ? (
           <div className="max-w-3xl mx-auto">

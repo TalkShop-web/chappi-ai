@@ -1,13 +1,10 @@
-
 import { LogIn, User } from "lucide-react";
 import { Link } from "react-router-dom";
-
 export function Header() {
-  return (
-    <header className="border-b border-border">
+  return <header className="border-b border-border">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-          <span className="text-xl font-bold">Chat Archive</span>
+          <span className="text-xl font-bold">Chappi.ai</span>
         </Link>
 
         <div className="flex items-center gap-4">
@@ -20,6 +17,5 @@ export function Header() {
           </button>
         </div>
       </div>
-    </header>
-  );
+    </header>;
 }

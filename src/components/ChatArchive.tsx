@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from "react";
 import { Search, MessageSquare, Brain } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -161,7 +162,6 @@ export function ChatArchive() {
             </div>
             <ServiceSettings
               services={services}
-              onServiceConnect={handleConnectService}
               showSettings={showSettings}
               onToggleSettings={() => setShowSettings(!showSettings)}
             />

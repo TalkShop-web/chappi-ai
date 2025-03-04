@@ -15,7 +15,15 @@ export function handleAuthSuccess({ user, operationType }: AuthSuccessParams): v
     console.log("Sign in successful for:", user.email)
     showToast({
       title: "Sign in successful",
-      description: `Welcome back, ${user.email}!`,
+      description: `Welcome back${user.email ? `, ${user.email}` : ''}!`,
+    })
+  } else if (operationType === 'signUp' && user) {
+    console.log("Sign up successful for:", user.email)
+    showToast({
+      title: "Account created",
+      description: user.email_confirmed_at !== null 
+        ? "You can now sign in with your account." 
+        : "Please check your email to confirm your account.",
     })
   } else if (operationType === 'signOut') {
     showToast({

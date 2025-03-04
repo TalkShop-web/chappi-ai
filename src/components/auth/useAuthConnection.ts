@@ -49,9 +49,9 @@ export function useAuthConnection(isOpen: boolean) {
       
       // Set to partial mode right away for better UX
       setConnectionStatus('partial');
-      setConnectionMessage("Connected to server, but full authentication status is pending.");
+      setConnectionMessage("Connected to server, pending full status check...");
       
-      // Then do the more thorough Supabase check
+      // Then do the more thorough check
       setTimeout(() => performThoroughTest(), 100);
       
     } catch (error) {

@@ -58,9 +58,7 @@ export function useServices() {
   });
 
   // Helper function to get the appropriate auth URL for each service
-  const getAuthUrl = (serviceName: ServiceConnection['service_name']): string => {
-    console.log(`Getting auth URL for ${serviceName}`);
-    
+  const getAuthUrl = (serviceName: ServiceConnection['service_name']): string => {    
     // In a real application, these would be actual OAuth authorization URLs
     // with your app's client ID and redirect URI
     switch (serviceName) {
@@ -81,8 +79,6 @@ export function useServices() {
   const initiateAuthFlow = useCallback(async (
     serviceName: ServiceConnection['service_name']
   ): Promise<void> => {
-    console.log(`Initiating auth flow for ${serviceName}`);
-    
     // Close any existing auth window
     if (authWindow && !authWindow.closed) {
       authWindow.close();
@@ -122,7 +118,6 @@ export function useServices() {
           if (newAuthWindow.closed) {
             clearAuthCheckInterval();
             setAuthWindow(null);
-            console.log(`Auth window for ${serviceName} closed by user`);
             resolve();
           }
         }, 500);
@@ -131,7 +126,6 @@ export function useServices() {
         // In a real OAuth implementation, you would listen for a redirect to your callback URL
         setTimeout(() => {
           if (!newAuthWindow.closed) {
-            console.log(`Auth flow for ${serviceName} timed out, considering successful`);
             clearAuthCheckInterval();
             // Don't close the window automatically, let the user close it when they're done
             resolve();
@@ -153,11 +147,6 @@ export function useServices() {
       isConnected: boolean
     }) => {
       if (!user?.id) throw new Error('No user logged in');
-
-      // If we're connecting, initiate the OAuth flow
-      if (isConnected) {
-        await initiateAuthFlow(serviceName);
-      }
 
       const { data, error } = await supabase
         .from('service_connections')

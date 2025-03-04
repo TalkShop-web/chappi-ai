@@ -1,4 +1,3 @@
-
 import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AIService } from "./types";
@@ -24,7 +23,7 @@ export function ServiceSettings({
   onConnectService
 }: ServiceSettingsProps) {
   const { user } = useAuth();
-  const { services: serviceConnections, isLoading, updateService } = useServices();
+  const { services: serviceConnections, isLoading, updateService, initiateAuthFlow } = useServices();
   const { toast } = useToast();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<AIService | null>(null);
@@ -64,31 +63,32 @@ export function ServiceSettings({
         });
       }
     } else {
-      // If not connected, show the auth modal
-      const service = services.find(s => s.name === serviceName);
-      if (service) {
-        setSelectedService(service);
-        setAuthModalOpen(true);
+      // For connecting services, directly open the auth window rather than showing the modal
+      try {
+        // Get the appropriate auth URL and open the window
+        await initiateAuthFlow(serviceName);
+        
+        // If window opened successfully, update the service connection
+        await updateService.mutateAsync({
+          serviceName,
+          isConnected: true,
+        });
+        
+        // Update the UI state in the parent component
+        onConnectService(serviceName, true);
+        
+        toast({
+          title: "Authentication Started",
+          description: `Please complete the authentication process for ${serviceName} in the new browser window.`
+        });
+      } catch (error) {
+        console.error("Failed to connect service:", error);
+        toast({
+          title: "Connection failed",
+          description: error instanceof Error ? error.message : `Could not connect to ${serviceName}`,
+          variant: "destructive"
+        });
       }
-    }
-  };
-
-  const handleAuthConnect = async (serviceName: AIService['name']) => {
-    try {
-      await updateService.mutateAsync({
-        serviceName,
-        isConnected: true,
-      });
-      
-      // Update the UI state in the parent component
-      onConnectService(serviceName, true);
-      
-      // Close the modal
-      setAuthModalOpen(false);
-      setSelectedService(null);
-    } catch (error) {
-      console.error("Failed to connect service:", error);
-      throw error; // Let the modal component handle the error
     }
   };
 
@@ -151,16 +151,6 @@ export function ServiceSettings({
           </div>
         </div>
       )}
-
-      <ServiceAuthModal 
-        isOpen={authModalOpen}
-        onClose={() => {
-          setAuthModalOpen(false);
-          setSelectedService(null);
-        }}
-        service={selectedService}
-        onConnect={handleAuthConnect}
-      />
     </div>
   );
 }

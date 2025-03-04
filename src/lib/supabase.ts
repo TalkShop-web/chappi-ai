@@ -12,3 +12,19 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true
   }
 })
+
+// Add a function to check if supabase is connected
+export const checkSupabaseConnection = async () => {
+  try {
+    const { data, error } = await supabase.from('service_connections').select('count', { count: 'exact' }).limit(1)
+    if (error) {
+      console.error('Supabase connection check failed:', error)
+      return false
+    }
+    console.log('Supabase connection successful')
+    return true
+  } catch (error) {
+    console.error('Supabase connection error:', error)
+    return false
+  }
+}

@@ -1,11 +1,11 @@
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle, Wifi, WifiOff } from 'lucide-react'
 import { checkSupabaseConnection } from '@/lib/supabase'
 
 interface AuthModalProps {
@@ -18,22 +18,33 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<'testing' | 'connected' | 'disconnected'>('testing')
   const [networkError, setNetworkError] = useState<string | null>(null)
   const { signIn, signUp } = useAuth()
   const { toast } = useToast()
 
   // Test connection when modal opens
-  useState(() => {
+  useEffect(() => {
     if (isOpen) {
       testConnection();
     }
-  });
+  }, [isOpen]);
 
   const testConnection = async () => {
+    setConnectionStatus('testing');
     setNetworkError(null);
-    const result = await checkSupabaseConnection();
-    if (!result.connected) {
-      setNetworkError("We're having trouble connecting to our servers. Please check your internet connection.");
+    
+    try {
+      const result = await checkSupabaseConnection();
+      setConnectionStatus(result.connected ? 'connected' : 'disconnected');
+      
+      if (!result.connected) {
+        setNetworkError("We're having trouble connecting to our servers. Please check your internet connection.");
+      }
+    } catch (error) {
+      console.error("Connection test error:", error);
+      setConnectionStatus('disconnected');
+      setNetworkError("Connection test failed. Please check your internet connection.");
     }
   };
 
@@ -42,14 +53,13 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setLoading(true)
     setNetworkError(null)
 
-    try {
-      // Check connection before attempting auth
-      const connectionTest = await checkSupabaseConnection();
-      if (!connectionTest.connected) {
-        setNetworkError("Network connection issue. Please check your internet connection and try again.");
-        return;
-      }
+    if (connectionStatus !== 'connected') {
+      setNetworkError("Cannot proceed without a connection to our servers. Please check your internet connection and try again.");
+      setLoading(false);
+      return;
+    }
 
+    try {
       if (isSignUp) {
         console.log(`Attempting to sign up with email: ${email}`)
         await signUp(email, password)
@@ -88,20 +98,39 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           <DialogTitle>{isSignUp ? 'Create an account' : 'Sign in'}</DialogTitle>
         </DialogHeader>
         
-        {networkError && (
-          <div className="bg-destructive/10 p-3 rounded-md flex items-center gap-2 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4" />
-            {networkError}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="ml-auto h-7" 
-              onClick={testConnection}
-            >
-              Retry
-            </Button>
-          </div>
-        )}
+        {/* Connection status indicator */}
+        <div className={`flex items-center gap-2 p-3 rounded-md text-sm ${
+          connectionStatus === 'connected' 
+            ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' 
+            : connectionStatus === 'testing' 
+              ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+              : 'bg-destructive/10 text-destructive'
+        }`}>
+          {connectionStatus === 'connected' ? (
+            <>
+              <Wifi className="h-4 w-4" />
+              Connected to server
+            </>
+          ) : connectionStatus === 'testing' ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Testing connection...
+            </>
+          ) : (
+            <>
+              <WifiOff className="h-4 w-4" />
+              {networkError || "Not connected to server"}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="ml-auto h-7" 
+                onClick={testConnection}
+              >
+                Retry
+              </Button>
+            </>
+          )}
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
@@ -110,7 +139,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            disabled={loading}
+            disabled={loading || connectionStatus !== 'connected'}
           />
           <Input
             type="password"
@@ -118,10 +147,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            disabled={loading}
+            disabled={loading || connectionStatus !== 'connected'}
             minLength={6}
           />
-          <Button type="submit" className="w-full" disabled={loading || !!networkError}>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={loading || connectionStatus !== 'connected'}
+          >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

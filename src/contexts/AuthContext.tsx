@@ -1,7 +1,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Provider } from '@supabase/supabase-js'
-import { supabase, checkSupabaseConnection } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/ui/use-toast'
 
 type AuthContextType = {
@@ -24,12 +24,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check active sessions
     const fetchSession = async () => {
       try {
+        console.log("Fetching initial session...");
         const { data: { session } } = await supabase.auth.getSession()
         setUser(session?.user ?? null)
-        setLoading(false)
         console.log("Session checked, user:", session?.user?.email || "No user")
       } catch (error) {
         console.error("Error fetching session:", error)
+      } finally {
         setLoading(false)
       }
     }
@@ -74,22 +75,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string) => {
     try {
       console.log("Attempting signup with:", email)
-      
-      // First verify Supabase connection
-      console.log("Testing Supabase connection before signup...")
-      const connectionTest = await checkSupabaseConnection()
-      
-      if (!connectionTest.connected) {
-        console.error("Cannot connect to Supabase:", connectionTest.error)
-        toast({
-          title: "Connection Error",
-          description: "Cannot connect to our servers. Please check your internet connection and try again.",
-          variant: "destructive"
-        })
-        throw new Error("Cannot connect to Supabase")
-      }
-      
-      console.log("Supabase connection verified, proceeding with signup")
       
       // Proceed with signup
       const { error, data } = await supabase.auth.signUp({ 

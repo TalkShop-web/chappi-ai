@@ -1,116 +1,58 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { checkSupabaseConnection, ConnectionCheckResult } from '@/lib/supabase'
-import { withTimeout, pingConnection } from '@/utils/connectionUtils'
-
-type ConnectionStatusType = 'testing' | 'connected' | 'disconnected' | 'partial'
+import { useEffect, useCallback } from 'react';
+import { useConnectionState } from '@/hooks/useConnectionState';
+import { useAbortController } from '@/hooks/useAbortController';
+import { useConnectionTesting } from '@/hooks/useConnectionTesting';
 
 export function useAuthConnection(isOpen: boolean) {
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('testing')
-  const [connectionMessage, setConnectionMessage] = useState<string | null>(null)
-  const [retryCount, setRetryCount] = useState(0)
-  const [testingAborted, setTestingAborted] = useState(false)
+  const {
+    connectionStatus,
+    connectionMessage,
+    retryCount,
+    testingAborted,
+    setConnectionStatus,
+    setConnectionMessage,
+    setRetryCount,
+    setTestingAborted
+  } = useConnectionState();
   
-  const isMountedRef = useRef(true);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const {
+    isMountedRef,
+    abortControllerRef,
+    abortCurrentOperation
+  } = useAbortController();
   
-  // Clear any pending operations on unmount
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
+  const {
+    performQuickTest,
+    performThoroughTest
+  } = useConnectionTesting(
+    isMountedRef,
+    testingAborted,
+    setConnectionStatus,
+    setConnectionMessage
+  );
 
-  const safeSetConnectionStatus = useCallback((status: ConnectionStatusType) => {
-    if (isMountedRef.current) {
-      setConnectionStatus(status);
-    }
-  }, []);
-  
-  const safeSetConnectionMessage = useCallback((message: string | null) => {
-    if (isMountedRef.current) {
-      setConnectionMessage(message);
-    }
-  }, []);
-  
   const testConnection = useCallback(async () => {
     if (!isOpen) return; // Don't test if modal is closed
     
     // Abort any ongoing tests
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
+    abortCurrentOperation();
     
-    safeSetConnectionStatus('testing');
+    setConnectionStatus('testing');
     setTestingAborted(false);
-    
-    if (!navigator.onLine) {
-      console.log("Browser reports device is offline");
-      safeSetConnectionStatus('disconnected');
-      safeSetConnectionMessage("Your device appears to be offline. Please check your internet connection.");
-      return;
-    }
     
     try {
       // First do a quick ping test to check basic connectivity
-      console.log("Performing quick connectivity test...");
-      const isConnected = await pingConnection();
+      const quickTestSucceeded = await performQuickTest();
       
-      if (testingAborted || !isMountedRef.current) {
-        console.log("Connection test was aborted");
-        return;
-      }
-      
-      if (!isConnected) {
-        console.log("Quick ping test failed - network appears down");
-        safeSetConnectionStatus('disconnected');
-        safeSetConnectionMessage("Unable to reach our servers. Your connection appears to be down or very slow.");
-        return;
-      }
-      
-      console.log("Quick ping successful, going to partial mode first");
+      if (!quickTestSucceeded || testingAborted || !isMountedRef.current) return;
       
       // Set to partial mode right away for better UX
-      safeSetConnectionStatus('partial');
-      safeSetConnectionMessage("Connected to server, but full authentication status is pending.");
+      setConnectionStatus('partial');
+      setConnectionMessage("Connected to server, but full authentication status is pending.");
       
       // Then do the more thorough Supabase check
-      setTimeout(async () => {
-        try {
-          if (testingAborted || !isMountedRef.current) return;
-          
-          console.log("Performing full Supabase connection check...");
-          const result = await withTimeout<ConnectionCheckResult>(
-            checkSupabaseConnection(), 
-            10000 // Increased timeout for more thorough check
-          );
-          
-          if (testingAborted || !isMountedRef.current) return;
-          
-          console.log("Supabase connection check result:", result);
-          
-          if (result.connected) {
-            safeSetConnectionStatus('connected');
-            safeSetConnectionMessage(null);
-          } else if (result.partial) {
-            safeSetConnectionStatus('partial');
-            safeSetConnectionMessage(result.message);
-          } else {
-            safeSetConnectionStatus('disconnected');
-            safeSetConnectionMessage(result.message);
-          }
-        } catch (error) {
-          if (testingAborted || !isMountedRef.current) return;
-          
-          console.error("Background Supabase check failed:", error);
-          safeSetConnectionStatus('partial');
-          safeSetConnectionMessage("Limited connection detected. Some features may work.");
-        }
-      }, 100);
+      setTimeout(() => performThoroughTest(), 100);
       
     } catch (error) {
       if (testingAborted || !isMountedRef.current) return;
@@ -121,20 +63,30 @@ export function useAuthConnection(isOpen: boolean) {
         (error.name === 'AbortError' || error.name === 'TimeoutError' || 
          error.message.includes('timed out') || error.message.includes('timeout'));
       
-      safeSetConnectionStatus('disconnected');
-      safeSetConnectionMessage(isTimeout
+      setConnectionStatus('disconnected');
+      setConnectionMessage(isTimeout
         ? "Connection test timed out. Server may be slow or unreachable."
         : error instanceof Error 
           ? `Connection error: ${error.message}` 
           : "Connection test failed. Please check your internet connection.");
     }
-  }, [isOpen, safeSetConnectionMessage, safeSetConnectionStatus, testingAborted]);
+  }, [
+    isOpen, 
+    abortCurrentOperation, 
+    setConnectionStatus, 
+    setTestingAborted, 
+    performQuickTest, 
+    testingAborted, 
+    isMountedRef, 
+    setConnectionMessage, 
+    performThoroughTest
+  ]);
 
   useEffect(() => {
     const handleOnlineStatusChange = () => {
       if (!navigator.onLine) {
-        safeSetConnectionStatus('disconnected');
-        safeSetConnectionMessage("Your device appears to be offline. Please check your internet connection.");
+        setConnectionStatus('disconnected');
+        setConnectionMessage("Your device appears to be offline. Please check your internet connection.");
       } else if (connectionStatus === 'disconnected' && isOpen) {
         testConnection();
       }
@@ -147,7 +99,7 @@ export function useAuthConnection(isOpen: boolean) {
       window.removeEventListener('online', handleOnlineStatusChange);
       window.removeEventListener('offline', handleOnlineStatusChange);
     };
-  }, [connectionStatus, isOpen, testConnection, safeSetConnectionStatus, safeSetConnectionMessage]);
+  }, [connectionStatus, isOpen, testConnection, setConnectionStatus, setConnectionMessage]);
 
   useEffect(() => {
     if (isOpen) {
@@ -174,7 +126,7 @@ export function useAuthConnection(isOpen: boolean) {
         abortControllerRef.current.abort();
       }
     }
-  }, [isOpen, connectionStatus, testConnection, testingAborted]);
+  }, [isOpen, connectionStatus, testConnection, testingAborted, isMountedRef, setTestingAborted, abortControllerRef]);
 
   const handleRetry = useCallback(() => {
     if (connectionStatus === 'testing') {
@@ -182,19 +134,19 @@ export function useAuthConnection(isOpen: boolean) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-      safeSetConnectionStatus('disconnected');
-      safeSetConnectionMessage("Connection test canceled.");
+      setConnectionStatus('disconnected');
+      setConnectionMessage("Connection test canceled.");
     } else {
       console.log("Manual retry requested");
       setRetryCount(prev => prev + 1);
       testConnection();
     }
-  }, [connectionStatus, testConnection, safeSetConnectionStatus, safeSetConnectionMessage]);
+  }, [connectionStatus, testConnection, setConnectionStatus, setConnectionMessage, setTestingAborted, abortControllerRef, setRetryCount]);
 
   return {
     connectionStatus,
     connectionMessage,
-    setConnectionMessage: safeSetConnectionMessage,
+    setConnectionMessage,
     testConnection,
     handleRetry,
     retryCount,

@@ -22,6 +22,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const {
     connectionStatus,
     connectionMessage,
+    setConnectionMessage,
     handleRetry,
     setRetryCount,
     testConnection

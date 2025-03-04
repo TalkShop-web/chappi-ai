@@ -93,6 +93,7 @@ export function useAuthConnection(isOpen: boolean) {
   return {
     connectionStatus,
     connectionMessage,
+    setConnectionMessage, // Added this line to expose the setter
     testConnection,
     handleRetry,
     retryCount,

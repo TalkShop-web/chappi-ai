@@ -22,7 +22,7 @@ export function useSignInOperation() {
         throw new Error("Device is offline")
       }
       
-      // Check connection with quick ping before proceeding
+      // Quick connection check before proceeding
       const isConnected = await pingConnection();
       if (!isConnected) {
         console.error("Ping test failed, connection appears to be down");
@@ -39,7 +39,7 @@ export function useSignInOperation() {
       
       console.log("Sending sign in request to Supabase...")
       
-      // Use retry with backoff for network resilience - with increased timeout and retries
+      // Use retry with backoff for network resilience - with shorter timeouts
       const response = await retryWithBackoff(
         async () => withTimeout(
           supabase.auth.signInWithPassword({ 
@@ -49,11 +49,11 @@ export function useSignInOperation() {
               captchaToken: undefined
             }
           }),
-          60000 // 60 seconds timeout for sign in
+          10000 // 10 seconds timeout instead of 60
         ),
-        3, // 3 retries max
-        2000, // Start with 2 second delay
-        15000, // Max 15 second delay
+        2, // 2 retries max instead of 3
+        500, // Start with 500ms delay instead of 2000
+        3000, // Max 3 second delay instead of 15000
         isNetworkError
       );
       

@@ -59,22 +59,22 @@ export const createTimeoutPromise = <T>(ms: number, errorMessage = "Request time
 };
 
 /**
- * Race a promise against a timeout - with increased default timeout
+ * Race a promise against a timeout - with more reasonable default timeout
  */
-export const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number = 60000): Promise<T> => {
+export const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number = 15000): Promise<T> => {
   const timeoutPromise = createTimeoutPromise<T>(timeoutMs, "Request timed out. Please check your connection and try again.");
   return Promise.race([promise, timeoutPromise]);
 };
 
 /**
  * Retry a promise-returning function with exponential backoff
- * More robust implementation with configurable options
+ * More efficient implementation with shorter delays
  */
 export const retryWithBackoff = async <T>(
   fn: () => Promise<T>,
-  retries = 3,
-  initialDelay = 1000,
-  maxDelay = 10000,
+  retries = 2,
+  initialDelay = 500,
+  maxDelay = 3000,
   shouldRetry = isNetworkError
 ): Promise<T> => {
   let lastError: any;
@@ -98,7 +98,7 @@ export const retryWithBackoff = async <T>(
       }
       
       // Add jitter to prevent thundering herd
-      const jitter = Math.random() * 200 - 100; // +/- 100ms
+      const jitter = Math.random() * 100 - 50; // +/- 50ms
       
       // Wait with exponential backoff plus jitter
       const actualDelay = Math.min(delay + jitter, maxDelay);
@@ -106,7 +106,7 @@ export const retryWithBackoff = async <T>(
       await new Promise(resolve => setTimeout(resolve, actualDelay));
       
       // Increase delay for next attempt, but don't exceed maxDelay
-      delay = Math.min(delay * 2, maxDelay);
+      delay = Math.min(delay * 1.5, maxDelay);
     }
   }
 
@@ -114,16 +114,15 @@ export const retryWithBackoff = async <T>(
 };
 
 /**
- * Regular ping to check connection status - more reliable implementation
- * @returns Promise that resolves to true if we have connectivity
+ * Simple ping to check connection status - faster implementation
  */
 export const pingConnection = async (): Promise<boolean> => {
   if (!navigator.onLine) return false;
   
   try {
-    // First try a simple HEAD request to check connectivity
+    // Try a fast HEAD request first
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout for reliability
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // Shorter timeout for quick feedback
     
     try {
       const response = await fetch('/', {
@@ -135,18 +134,18 @@ export const pingConnection = async (): Promise<boolean> => {
       clearTimeout(timeoutId);
       return response.ok;
     } catch (err) {
-      // Fall back to img ping if HEAD request fails
-      console.log('HEAD ping failed, trying image ping...');
+      // Fall back to image ping if HEAD request fails
+      console.log('Fast ping failed, trying image ping...');
       
       // Use an image ping as fallback (more reliable through firewalls)
       return new Promise((resolve) => {
         const img = new Image();
         
-        // Set a timeout to avoid hanging
+        // Set a shorter timeout
         const imgTimeoutId = setTimeout(() => {
           img.onload = img.onerror = null;
           resolve(false);
-        }, 5000);
+        }, 3000);
         
         img.onload = () => {
           clearTimeout(imgTimeoutId);

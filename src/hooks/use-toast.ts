@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 5
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 5000 // Reduced from 1000000ms to 5000ms (5 seconds)
 
 type ToasterToast = ToastProps & {
   id: string
@@ -142,7 +142,14 @@ function toast({ ...props }: Toast) {
       type: actionTypes.UPDATE_TOAST,
       toast: { ...props, id },
     })
-  const dismiss = () => dispatch({ type: actionTypes.DISMISS_TOAST, toastId: id })
+    
+  const dismiss = () => {
+    if (toastTimeouts.has(id)) {
+      clearTimeout(toastTimeouts.get(id)!)
+      toastTimeouts.delete(id)
+    }
+    dispatch({ type: actionTypes.DISMISS_TOAST, toastId: id })
+  }
 
   dispatch({
     type: actionTypes.ADD_TOAST,

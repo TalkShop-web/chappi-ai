@@ -23,7 +23,7 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
       return (
         <div className="flex items-center gap-2 p-3 rounded-md text-sm bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
           <ServerOff className="h-4 w-4" />
-          {message}
+          {message || "Partial connection to services"}
           <Button 
             variant="outline" 
             size="sm" 
@@ -36,9 +36,19 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
       );
     case 'testing':
       return (
-        <div className="flex items-center gap-2 p-3 rounded-md text-sm bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Testing connection...
+        <div className="flex items-center justify-between gap-2 p-3 rounded-md text-sm bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Testing connection...</span>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7" 
+            onClick={onRetry}
+          >
+            Cancel
+          </Button>
         </div>
       );
     case 'disconnected':
@@ -46,11 +56,13 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
       return (
         <div className="flex items-center gap-2 p-3 rounded-md text-sm bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
           <WifiOff className="h-4 w-4" />
-          {message || "Not connected to server"}
+          <div className="flex-1">
+            {message || "Not connected to server"}
+          </div>
           <Button 
             variant="outline" 
             size="sm" 
-            className="ml-auto h-7" 
+            className="h-7" 
             onClick={onRetry}
           >
             Retry

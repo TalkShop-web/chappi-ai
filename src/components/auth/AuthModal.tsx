@@ -57,7 +57,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     e.preventDefault()
     
     if (connectionStatus === 'disconnected') {
-      setConnectionMessage("Cannot proceed without a connection to our servers. Please check your internet connection and try again.");
+      toast({
+        title: "Connection Error",
+        description: "Cannot proceed without a connection to our servers. Please check your internet connection and try again.",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -86,6 +90,9 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }
   }
 
+  // Determine whether to allow auth operations based on connection status
+  const isConnectionAcceptable = connectionStatus === 'connected' || connectionStatus === 'partial'
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) onClose();
@@ -108,7 +115,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         <AuthForm 
           isSignUp={isSignUp}
           loading={loading}
-          connectionDisabled={connectionStatus === 'disconnected'}
+          connectionDisabled={!isConnectionAcceptable}
           onSubmit={handleSubmit}
           onToggleMode={handleToggleMode}
         />

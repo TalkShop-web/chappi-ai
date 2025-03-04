@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://38a9e9b6-f1cf-4510-aad9-31f7ae0d3fab.supabase.co'
@@ -84,37 +85,39 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
     
     // First, try a quick auth check which should be faster than DB
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutPromise = new Promise<any>((_, reject) => {
+        setTimeout(() => reject(new Error('Connection timed out')), 5000);
+      });
       
-      const authCheck = await supabase.auth.getSession();
+      // Using Promise.race to implement timeout
+      const authCheckPromise = supabase.auth.getSession();
+      const result = await Promise.race([authCheckPromise, timeoutPromise]);
       
-      clearTimeout(timeoutId);
-      
-      if (authCheck.error) {
-        console.error('Auth connection error:', authCheck.error.message);
+      if (result.error) {
+        console.error('Auth connection error:', result.error.message);
         return {
           connected: false,
-          error: authCheck.error,
-          message: `Unable to connect to authentication service: ${authCheck.error.message}`
+          error: result.error,
+          message: `Unable to connect to authentication service: ${result.error.message}`
         };
       }
       
       // If we can connect to auth, we're at least partially connected
       return {
         connected: true,
-        partial: true,
+        partial: false, // Consider it fully connected if auth works
         error: null,
         message: 'Connected to authentication service'
       };
     } catch (err: any) {
       // Specific error handling for various network issues
       if (err) {
-        if (err.name === 'AbortError') {
+        if (err.name === 'AbortError' || err.message.includes('timed out')) {
           return {
             connected: false,
+            partial: true, // Consider it partially connected even if auth times out
             error: err,
-            message: 'Connection timed out. The server may be under heavy load or your connection is slow.'
+            message: 'Connection is slow. Basic functionality may work, but some features might be limited.'
           };
         }
         
@@ -126,20 +129,28 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
           };
         }
       }
-      throw err;
+      
+      // Default case - could have some connection
+      return {
+        connected: false,
+        partial: true,
+        error: err,
+        message: 'Limited connection detected. Some features may work.'
+      };
     }
   } catch (error: any) {
     console.error('Supabase connection error:', error);
     
     // Distinguish between timeout and other errors
-    const isTimeoutError = error instanceof DOMException && error.name === 'AbortError';
+    const isTimeoutError = error instanceof Error && 
+      (error.name === 'AbortError' || error.message.includes('timed out'));
     const isNetworkError = error.message === 'Failed to fetch' || !navigator.onLine;
     
     return {
       connected: false,
       error: error as Error,
       message: isTimeoutError 
-        ? 'Connection timed out. Server may be unavailable or your connection is slow.'
+        ? 'Connection timed out. Basic features will still work offline.'
         : isNetworkError
           ? 'Network error detected. Please check your internet connection.'
           : error instanceof Error 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react'
 import { checkSupabaseConnection, ConnectionCheckResult } from '@/lib/supabase'
 import { withTimeout, retryWithBackoff, pingConnection } from '@/utils/connectionUtils'
@@ -9,10 +8,12 @@ export function useAuthConnection(isOpen: boolean) {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('testing')
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
+  const [testingAborted, setTestingAborted] = useState(false)
 
   // Memoize the testConnection function to prevent recreation in useEffect dependencies
   const testConnection = useCallback(async () => {
     setConnectionStatus('testing');
+    setTestingAborted(false);
     
     // First check browser's online status
     if (!navigator.onLine) {
@@ -25,6 +26,13 @@ export function useAuthConnection(isOpen: boolean) {
     try {
       // First try a quick ping - this is faster than the full Supabase check
       const isConnected = await pingConnection();
+      
+      // If the testing was aborted, don't update status
+      if (testingAborted) {
+        console.log("Connection test was aborted");
+        return;
+      }
+      
       if (!isConnected) {
         console.log("Quick ping test failed - network appears down");
         setConnectionStatus('disconnected');
@@ -32,30 +40,47 @@ export function useAuthConnection(isOpen: boolean) {
         return;
       }
       
-      console.log("Quick ping successful, testing connection to Supabase...");
+      console.log("Quick ping successful, skipping full Supabase connection test...");
       
-      // Use retry with backoff for more robust connection testing
-      const result = await retryWithBackoff(
-        async () => withTimeout<ConnectionCheckResult>(checkSupabaseConnection(), 10000),
-        1, // Just 1 retry for connection test
-        500, // Start with 500ms delay
-        2000, // Max 2 second delay
-        (error) => true // Always retry on connection check errors
-      );
+      // Since we have a successful ping, we can consider the connection as partial
+      // This avoids the long timeout issues with the full Supabase connection test
+      setConnectionStatus('partial');
+      setConnectionMessage("Connected to server, but full authentication status is pending.");
       
-      console.log("Connection test result:", result);
+      // Attempt the full Supabase check, but don't block UI
+      setTimeout(async () => {
+        try {
+          if (testingAborted) return;
+          
+          // Perform a simple check against Supabase, but with a shorter timeout
+          const result = await withTimeout<ConnectionCheckResult>(
+            checkSupabaseConnection(), 
+            5000 // 5 second timeout
+          );
+          
+          if (testingAborted) return;
+          
+          if (result.connected) {
+            setConnectionStatus('connected');
+            setConnectionMessage(null);
+          } else if (result.partial) {
+            setConnectionStatus('partial');
+            setConnectionMessage(result.message);
+          } else {
+            setConnectionStatus('disconnected');
+            setConnectionMessage(result.message);
+          }
+        } catch (error) {
+          if (testingAborted) return;
+          
+          console.log("Background Supabase check failed, staying in partial mode", error);
+          // Keep the partial status, don't change to disconnected
+        }
+      }, 100);
       
-      if (result.partial) {
-        setConnectionStatus('partial');
-        setConnectionMessage(result.message || "Connected to authentication but database access limited");
-      } else if (result.connected) {
-        setConnectionStatus('connected');
-        setConnectionMessage(null);
-      } else {
-        setConnectionStatus('disconnected');
-        setConnectionMessage(result.message || "Connection to our servers failed. Please check your internet connection.");
-      }
     } catch (error) {
+      if (testingAborted) return;
+      
       console.error("Connection test error:", error);
       
       // Display specific error message for timeout
@@ -70,7 +95,7 @@ export function useAuthConnection(isOpen: boolean) {
           ? `Connection error: ${error.message}` 
           : "Connection test failed. Please check your internet connection.");
     }
-  }, []);
+  }, [testingAborted]);
 
   // Check browser online status first, before testing Supabase connection
   useEffect(() => {
@@ -100,7 +125,7 @@ export function useAuthConnection(isOpen: boolean) {
       
       // Retry connection tests less frequently to avoid hammering the server
       const intervalId = setInterval(() => {
-        if ((connectionStatus === 'disconnected' || connectionStatus === 'partial') && isOpen) {
+        if ((connectionStatus === 'disconnected') && isOpen && !testingAborted) {
           console.log("Retrying connection test...");
           testConnection();
         }
@@ -108,12 +133,20 @@ export function useAuthConnection(isOpen: boolean) {
       
       return () => clearInterval(intervalId);
     }
-  }, [isOpen, connectionStatus, testConnection]);
+  }, [isOpen, connectionStatus, testConnection, testingAborted]);
 
   const handleRetry = () => {
-    console.log("Manual retry requested");
-    setRetryCount(prev => prev + 1);
-    testConnection();
+    if (connectionStatus === 'testing') {
+      // If we're testing, abort the test
+      setTestingAborted(true);
+      setConnectionStatus('disconnected');
+      setConnectionMessage("Connection test canceled.");
+    } else {
+      // Otherwise start a new test
+      console.log("Manual retry requested");
+      setRetryCount(prev => prev + 1);
+      testConnection();
+    }
   };
 
   return {

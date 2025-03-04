@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { checkSupabaseConnection, ConnectionCheckResult } from '@/lib/supabase'
-import { withTimeout, retryWithBackoff, pingConnection } from '@/utils/connectionUtils'
+import { withTimeout, pingConnection } from '@/utils/connectionUtils'
 
 type ConnectionStatusType = 'testing' | 'connected' | 'disconnected' | 'partial'
 

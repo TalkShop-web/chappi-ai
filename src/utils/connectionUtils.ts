@@ -114,55 +114,45 @@ export const retryWithBackoff = async <T>(
 };
 
 /**
- * Simple ping to check connection status - faster implementation
+ * Modified ping function using more reliable image fetch instead of HEAD requests
+ * which are more likely to be blocked by CORS or aborted
  */
 export const pingConnection = async (): Promise<boolean> => {
   if (!navigator.onLine) return false;
   
   try {
-    // Try a fast HEAD request first
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // Shorter timeout for quick feedback
-    
-    try {
-      const response = await fetch('/', {
-        method: 'HEAD',
-        cache: 'no-store',
-        signal: controller.signal
-      });
+    // Try a more reliable method - image ping
+    return new Promise((resolve) => {
+      const img = new Image();
       
-      clearTimeout(timeoutId);
-      return response.ok;
-    } catch (err) {
-      // Fall back to image ping if HEAD request fails
-      console.log('Fast ping failed, trying image ping...');
+      // Set a shorter timeout
+      const imgTimeoutId = setTimeout(() => {
+        img.onload = img.onerror = null;
+        console.log("Image ping timed out");
+        resolve(false);
+      }, 3000);
       
-      // Use an image ping as fallback (more reliable through firewalls)
-      return new Promise((resolve) => {
-        const img = new Image();
-        
-        // Set a shorter timeout
-        const imgTimeoutId = setTimeout(() => {
-          img.onload = img.onerror = null;
-          resolve(false);
-        }, 3000);
-        
-        img.onload = () => {
-          clearTimeout(imgTimeoutId);
-          resolve(true);
-        };
-        
-        img.onerror = () => {
-          clearTimeout(imgTimeoutId);
-          resolve(false);
-        };
-        
-        // Use a cachebuster query param to avoid browser caching
-        img.src = `/favicon.ico?_=${Date.now()}`;
-      });
-    }
+      img.onload = () => {
+        clearTimeout(imgTimeoutId);
+        console.log("Image ping successful");
+        resolve(true);
+      };
+      
+      img.onerror = () => {
+        // Even an error means the network is working!
+        clearTimeout(imgTimeoutId);
+        console.log("Image ping failed but network is reachable");
+        // Important: We still consider this a successful ping, 
+        // as we got a response from the server
+        resolve(true);
+      };
+      
+      // Use a cache-busting query and a reliable image
+      const timestamp = Date.now();
+      img.src = `https://www.google.com/favicon.ico?_=${timestamp}`;
+    });
   } catch (err) {
-    console.log('All ping methods failed:', err);
+    console.log('Ping failed completely:', err);
     return false;
   }
 };

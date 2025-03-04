@@ -56,26 +56,7 @@ export function useServices() {
   const initiateAuthFlow = async (
     serviceName: ServiceConnection['service_name']
   ): Promise<void> => {
-    // Determine the auth URL based on the service
-    const authUrl = getAuthUrl(serviceName);
-    
-    // Open the authentication window
-    const width = 600;
-    const height = 700;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-    
-    const authWindowInstance = window.open(
-      authUrl,
-      `Connect to ${serviceName}`,
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-    
-    if (!authWindowInstance) {
-      throw new Error('Could not open authentication window. Please allow popups for this site.');
-    }
-    
-    setAuthWindow(authWindowInstance);
+    console.log(`Initiating auth flow for ${serviceName}`);
     
     // In a real implementation, we would:
     // 1. Listen for a message from the auth window (via postMessage)
@@ -87,10 +68,7 @@ export function useServices() {
     return new Promise((resolve) => {
       // Simulate auth completion after a delay
       setTimeout(() => {
-        if (authWindowInstance && !authWindowInstance.closed) {
-          authWindowInstance.close();
-        }
-        setAuthWindow(null);
+        console.log(`Auth flow for ${serviceName} completed`);
         resolve();
       }, 3000);
     });

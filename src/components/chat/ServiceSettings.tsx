@@ -3,7 +3,7 @@ import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AIService } from "./types";
 import { useServices } from "@/hooks/useServices";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/auth/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";

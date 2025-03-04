@@ -15,7 +15,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     headers: {
       'X-Client-Info': 'chappi-app'
     },
-    fetch: (...args: Parameters<typeof fetch>) => {
+    fetch: (...args) => {
       // Use a fetch with timeout
       const controller = new AbortController();
       const { signal } = controller;
@@ -23,7 +23,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       // Set timeout to 10 seconds
       const timeoutId = setTimeout(() => controller.abort(), 10000);
       
-      return fetch(...args, { signal })
+      return fetch(args[0], { ...args[1], signal })
         .then(response => {
           clearTimeout(timeoutId);
           return response;

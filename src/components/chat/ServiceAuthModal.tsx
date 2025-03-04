@@ -26,23 +26,24 @@ export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: Servic
   if (!service) return null;
 
   const handleConnect = async () => {
-    setIsLoading(true);
-    
     try {
+      setIsLoading(true);
       await onConnect(service.name);
       
-      // Success is handled by the parent component which will close the modal
       toast({
         title: "Authentication Started",
-        description: `Please complete the authentication process for ${service.name} in the popup window.`
+        description: `Please complete the authentication process for ${service.name} in the new browser window.`
       });
+      
+      // Don't close here - let the parent handle it after auth is confirmed
     } catch (error) {
+      console.error("Auth error:", error);
       toast({
         title: "Connection Failed",
         description: error instanceof Error ? error.message : `Could not connect to ${service.name}`,
         variant: "destructive"
       });
-      
+    } finally {
       setIsLoading(false);
     }
   };
@@ -68,7 +69,7 @@ export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: Servic
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             You'll be redirected to {service.name} to authorize access to your account.
-            No API keys are required. A popup window will open for authentication.
+            A new browser window will open for authentication.
           </p>
           
           <div className="flex justify-end gap-2">

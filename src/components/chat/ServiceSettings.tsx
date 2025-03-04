@@ -10,30 +10,41 @@ interface ServiceSettingsProps {
   services: AIService[];
   onToggleSettings: () => void;
   showSettings: boolean;
+  onConnectService: (serviceName: AIService['name'], isConnected: boolean) => void;
 }
 
 export function ServiceSettings({ 
   services, 
   showSettings, 
-  onToggleSettings 
+  onToggleSettings,
+  onConnectService
 }: ServiceSettingsProps) {
   const { user } = useAuth();
   const { services: serviceConnections, isLoading, updateService } = useServices();
 
   const handleServiceConnect = async (serviceName: AIService['name']) => {
     if (!user) {
-      // You might want to show the auth modal here
+      // User needs to be authenticated to connect services
       return;
     }
 
     const currentConnection = serviceConnections?.find(
       (s) => s.service_name === serviceName
     );
-
-    await updateService.mutateAsync({
-      serviceName,
-      isConnected: !(currentConnection?.is_connected),
-    });
+    
+    const newConnectionState = !(currentConnection?.is_connected);
+    
+    try {
+      await updateService.mutateAsync({
+        serviceName,
+        isConnected: newConnectionState,
+      });
+      
+      // Update the UI state in the parent component
+      onConnectService(serviceName, newConnectionState);
+    } catch (error) {
+      console.error("Failed to update service connection:", error);
+    }
   };
 
   return (

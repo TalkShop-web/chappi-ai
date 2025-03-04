@@ -1,11 +1,12 @@
 
-import { useState, useMemo } from "react";
-import { Search, MessageSquare, Brain } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Search, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ServiceSettings } from "./chat/ServiceSettings";
 import { FolderView } from "./chat/FolderView";
 import { ChatDetail } from "./chat/ChatDetail";
 import { Chat, AIService, TopicFolder } from "./chat/types";
+import { useServices } from "@/hooks/useServices";
 
 const aiServices: AIService[] = [
   {
@@ -65,6 +66,24 @@ export function ChatArchive() {
   const [showSettings, setShowSettings] = useState(false);
   const [services, setServices] = useState<AIService[]>(aiServices);
   const { toast } = useToast();
+  const { services: serviceConnections, isLoading } = useServices();
+
+  // Sync services with connections from the useServices hook
+  useEffect(() => {
+    if (!isLoading && serviceConnections) {
+      setServices(prev => 
+        prev.map(service => {
+          const connection = serviceConnections.find(
+            sc => sc.service_name === service.name
+          );
+          return {
+            ...service,
+            isConnected: connection?.is_connected || false
+          };
+        })
+      );
+    }
+  }, [serviceConnections, isLoading]);
 
   const topicFolders = useMemo(() => {
     const folders: Record<string, TopicFolder> = {};
@@ -92,27 +111,19 @@ export function ChatArchive() {
     )
   );
 
-  const handleConnectService = (serviceName: AIService["name"]) => {
-    if (serviceName === "Perplexity") {
-      toast({
-        title: "Perplexity Connection",
-        description: "Please provide your Perplexity API key to connect.",
-      });
-      setShowSettings(true);
-      return;
-    }
-
+  const handleConnectService = (serviceName: AIService["name"], isConnected: boolean) => {
+    // Update local UI state
     setServices(prev =>
       prev.map(service =>
         service.name === serviceName
-          ? { ...service, isConnected: !service.isConnected }
+          ? { ...service, isConnected }
           : service
       )
     );
 
     toast({
       title: "Service connection updated",
-      description: `${serviceName} has been ${services.find(s => s.name === serviceName)?.isConnected ? 'disconnected' : 'connected'}.`,
+      description: `${serviceName} has been ${isConnected ? 'connected' : 'disconnected'}.`,
     });
   };
 
@@ -164,6 +175,7 @@ export function ChatArchive() {
               services={services}
               showSettings={showSettings}
               onToggleSettings={() => setShowSettings(!showSettings)}
+              onConnectService={handleConnectService}
             />
           </div>
         </div>

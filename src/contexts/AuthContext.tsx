@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Provider } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { useToast } from '@/components/ui/use-toast'
 
 type AuthContextType = {
   user: User | null
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
   useEffect(() => {
     // Check active sessions
@@ -27,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("Auth state changed:", _event, session?.user?.email || "No user")
       setUser(session?.user ?? null)
     })
 
@@ -34,28 +37,103 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    try {
+      const { error, data } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        toast({
+          title: "Sign in failed",
+          description: error.message,
+          variant: "destructive"
+        })
+        throw error
+      }
+      if (data?.user) {
+        toast({
+          title: "Sign in successful",
+          description: `Welcome back, ${data.user.email}!`,
+        })
+      }
+    } catch (error) {
+      console.error("Sign in error:", error)
+      throw error
+    }
   }
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) throw error
+    try {
+      console.log("Attempting signup with:", email)
+      const { error, data } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}`
+        }
+      })
+      
+      if (error) {
+        console.error("Signup error:", error)
+        toast({
+          title: "Sign up failed",
+          description: error.message,
+          variant: "destructive"
+        })
+        throw error
+      }
+
+      console.log("Signup response:", data)
+      
+      // Success message even if email confirmation is required
+      toast({
+        title: "Account created",
+        description: data.user ? "You can now sign in." : "Please check your email to confirm your account.",
+      })
+    } catch (error) {
+      console.error("Signup process error:", error)
+      throw error
+    }
   }
 
   const signInWithProvider = async (provider: Provider) => {
-    const { error } = await supabase.auth.signInWithOAuth({ 
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ 
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      })
+      if (error) {
+        toast({
+          title: "Provider sign in failed",
+          description: error.message,
+          variant: "destructive"
+        })
+        throw error
       }
-    })
-    if (error) throw error
+    } catch (error) {
+      console.error("Provider sign in error:", error)
+      throw error
+    }
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        toast({
+          title: "Sign out failed",
+          description: error.message,
+          variant: "destructive"
+        })
+        throw error
+      }
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out."
+      })
+    } catch (error) {
+      console.error("Sign out error:", error)
+      throw error
+    }
   }
 
   return (

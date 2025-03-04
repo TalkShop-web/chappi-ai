@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/use-toast'
+import { Loader2 } from 'lucide-react'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -25,23 +26,18 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
     try {
       if (isSignUp) {
+        console.log(`Attempting to sign up with email: ${email}`)
         await signUp(email, password)
-        toast({
-          title: "Account created",
-          description: "Please check your email to verify your account"
-        })
+        // Don't close modal if email verification is required
       } else {
         await signIn(email, password)
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully signed in"
-        })
+        onClose()
       }
-      onClose()
     } catch (error) {
+      console.error('Auth error:', error)
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "An error occurred",
+        title: isSignUp ? "Sign up failed" : "Sign in failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive"
       })
     } finally {
@@ -62,6 +58,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={loading}
           />
           <Input
             type="password"
@@ -69,9 +66,18 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={loading}
+            minLength={6}
           />
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Loading...' : isSignUp ? 'Sign up' : 'Sign in'}
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {isSignUp ? 'Creating account...' : 'Signing in...'}
+              </>
+            ) : (
+              isSignUp ? 'Sign up' : 'Sign in'
+            )}
           </Button>
         </form>
         <div className="text-center text-sm">
@@ -79,6 +85,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             type="button"
             onClick={() => setIsSignUp(!isSignUp)}
             className="text-primary hover:underline"
+            disabled={loading}
           >
             {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
           </button>

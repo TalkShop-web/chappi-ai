@@ -33,12 +33,26 @@ export function useServices() {
   const updateService = useMutation({
     mutationFn: async ({ 
       serviceName, 
-      isConnected 
+      isConnected,
+      apiKey 
     }: { 
       serviceName: ServiceConnection['service_name']
-      isConnected: boolean 
+      isConnected: boolean
+      apiKey?: string
     }) => {
       if (!user?.id) throw new Error('No user logged in')
+
+      // If we're connecting and have an API key, first validate it
+      if (isConnected && apiKey) {
+        const isValid = await validateApiKey(serviceName, apiKey);
+        if (!isValid) {
+          throw new Error(`Invalid API key for ${serviceName}`);
+        }
+        
+        // Here we would store the API key securely, but for this demo
+        // we'll just simulate successful connection
+        console.log(`API key for ${serviceName} is valid`);
+      }
 
       const { data, error } = await supabase
         .from('service_connections')
@@ -69,6 +83,26 @@ export function useServices() {
       })
     },
   })
+
+  // This function would validate the API key with the respective service
+  // For demo purposes, we'll just simulate validation
+  const validateApiKey = async (
+    serviceName: ServiceConnection['service_name'], 
+    apiKey: string
+  ): Promise<boolean> => {
+    // In a real app, you would make an API call to validate the key
+    // This is just a placeholder that accepts any non-empty key
+    if (!apiKey.trim()) return false;
+    
+    // Here you would implement actual API validation:
+    // e.g., for OpenAI:
+    // const response = await fetch('https://api.openai.com/v1/models', {
+    //   headers: { 'Authorization': `Bearer ${apiKey}` }
+    // });
+    // return response.ok;
+    
+    return true;
+  }
 
   return {
     services,

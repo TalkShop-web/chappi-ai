@@ -7,6 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { useState } from "react";
+import { ServiceAuthModal } from "./ServiceAuthModal";
 
 interface ServiceSettingsProps {
   services: AIService[];
@@ -24,6 +26,8 @@ export function ServiceSettings({
   const { user } = useAuth();
   const { services: serviceConnections, isLoading, updateService } = useServices();
   const { toast } = useToast();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState<AIService | null>(null);
 
   const handleServiceConnect = async (serviceName: AIService['name']) => {
     if (!user) {
@@ -39,24 +43,45 @@ export function ServiceSettings({
       (s) => s.service_name === serviceName
     );
     
-    const newConnectionState = !(currentConnection?.is_connected);
-    
-    try {
-      await updateService.mutateAsync({
-        serviceName,
-        isConnected: newConnectionState,
-      });
-      
-      // Update the UI state in the parent component
-      onConnectService(serviceName, newConnectionState);
-    } catch (error) {
-      console.error("Failed to update service connection:", error);
-      toast({
-        title: "Connection failed",
-        description: "Could not update the service connection. Please try again.",
-        variant: "destructive"
-      });
+    const isCurrentlyConnected = currentConnection?.is_connected || false;
+
+    // If already connected, we'll disconnect
+    if (isCurrentlyConnected) {
+      try {
+        await updateService.mutateAsync({
+          serviceName,
+          isConnected: false,
+        });
+        
+        // Update the UI state in the parent component
+        onConnectService(serviceName, false);
+      } catch (error) {
+        console.error("Failed to update service connection:", error);
+        toast({
+          title: "Connection failed",
+          description: "Could not update the service connection. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } else {
+      // If not connected, show the auth modal
+      const service = services.find(s => s.name === serviceName);
+      if (service) {
+        setSelectedService(service);
+        setAuthModalOpen(true);
+      }
     }
+  };
+
+  const handleApiConnect = async (serviceName: AIService['name'], apiKey: string) => {
+    await updateService.mutateAsync({
+      serviceName,
+      isConnected: true,
+      apiKey,
+    });
+    
+    // Update the UI state in the parent component
+    onConnectService(serviceName, true);
   };
 
   return (
@@ -118,6 +143,16 @@ export function ServiceSettings({
           </div>
         </div>
       )}
+
+      <ServiceAuthModal 
+        isOpen={authModalOpen}
+        onClose={() => {
+          setAuthModalOpen(false);
+          setSelectedService(null);
+        }}
+        service={selectedService}
+        onConnect={handleApiConnect}
+      />
     </div>
   );
 }

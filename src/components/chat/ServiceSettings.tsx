@@ -5,6 +5,8 @@ import { AIService } from "./types";
 import { useServices } from "@/hooks/useServices";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ServiceSettingsProps {
   services: AIService[];
@@ -21,10 +23,15 @@ export function ServiceSettings({
 }: ServiceSettingsProps) {
   const { user } = useAuth();
   const { services: serviceConnections, isLoading, updateService } = useServices();
+  const { toast } = useToast();
 
   const handleServiceConnect = async (serviceName: AIService['name']) => {
     if (!user) {
-      // User needs to be authenticated to connect services
+      toast({
+        title: "Authentication required",
+        description: "You need to be logged in to connect services.",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -44,19 +51,25 @@ export function ServiceSettings({
       onConnectService(serviceName, newConnectionState);
     } catch (error) {
       console.error("Failed to update service connection:", error);
+      toast({
+        title: "Connection failed",
+        description: "Could not update the service connection. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between w-full">
-        <button
+        <Button
           onClick={onToggleSettings}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="w-full flex items-center justify-center gap-2"
+          variant="default"
         >
           <Settings className="h-4 w-4" />
           Integrations
-        </button>
+        </Button>
       </div>
 
       {showSettings && (
@@ -79,7 +92,7 @@ export function ServiceSettings({
                 const isConnected = connection?.is_connected || false;
 
                 return (
-                  <button
+                  <Button
                     key={service.name}
                     onClick={() => handleServiceConnect(service.name)}
                     className={cn(
@@ -89,6 +102,7 @@ export function ServiceSettings({
                         ? "bg-primary text-primary-foreground"
                         : "bg-secondary hover:bg-secondary/80"
                     )}
+                    variant={isConnected ? "default" : "secondary"}
                   >
                     <span className="flex items-center gap-2">
                       <span>{service.icon}</span>
@@ -97,7 +111,7 @@ export function ServiceSettings({
                     <span className="text-xs">
                       {isConnected ? "Connected" : "Connect"}
                     </span>
-                  </button>
+                  </Button>
                 );
               })
             )}

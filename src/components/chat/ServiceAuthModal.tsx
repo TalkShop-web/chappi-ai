@@ -1,8 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
 import { AIService } from './types';
 
 interface ServiceAuthModalProps {
@@ -12,41 +11,9 @@ interface ServiceAuthModalProps {
   onConnect: (serviceName: AIService['name']) => Promise<void>;
 }
 
+// This component is kept for reference but no longer used in the current implementation
 export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: ServiceAuthModalProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
-
-  // Reset loading state when modal opens or closes
-  useEffect(() => {
-    if (!isOpen) {
-      setIsLoading(false);
-    }
-  }, [isOpen]);
-
   if (!service) return null;
-
-  const handleConnect = async () => {
-    try {
-      setIsLoading(true);
-      await onConnect(service.name);
-      
-      toast({
-        title: "Authentication Started",
-        description: `Please complete the authentication process for ${service.name} in the new browser window.`
-      });
-      
-      // Don't close here - let the parent handle it after auth is confirmed
-    } catch (error) {
-      console.error("Auth error:", error);
-      toast({
-        title: "Connection Failed",
-        description: error instanceof Error ? error.message : `Could not connect to ${service.name}`,
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -77,15 +44,13 @@ export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: Servic
               type="button" 
               variant="outline" 
               onClick={onClose}
-              disabled={isLoading}
             >
               Cancel
             </Button>
             <Button 
-              onClick={handleConnect} 
-              disabled={isLoading}
+              onClick={() => onConnect(service.name)}
             >
-              {isLoading ? "Connecting..." : `Connect to ${service.name}`}
+              Connect to {service.name}
             </Button>
           </div>
         </div>

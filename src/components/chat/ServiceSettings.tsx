@@ -1,3 +1,4 @@
+
 import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AIService } from "./types";
@@ -7,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useState } from "react";
-import { ServiceAuthModal } from "./ServiceAuthModal";
 
 interface ServiceSettingsProps {
   services: AIService[];
@@ -25,8 +25,7 @@ export function ServiceSettings({
   const { user } = useAuth();
   const { services: serviceConnections, isLoading, updateService, initiateAuthFlow } = useServices();
   const { toast } = useToast();
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<AIService | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState<string | null>(null);
 
   const handleServiceConnect = async (serviceName: AIService['name']) => {
     if (!user) {
@@ -63,12 +62,15 @@ export function ServiceSettings({
         });
       }
     } else {
-      // For connecting services, directly open the auth window rather than showing the modal
+      // For connecting services, we'll open the auth window
       try {
-        // Get the appropriate auth URL and open the window
+        setIsAuthenticating(serviceName);
+        
+        // Open the auth window
         await initiateAuthFlow(serviceName);
         
-        // If window opened successfully, update the service connection
+        // If we're here, the auth window was closed
+        // Update the service connection
         await updateService.mutateAsync({
           serviceName,
           isConnected: true,
@@ -78,8 +80,8 @@ export function ServiceSettings({
         onConnectService(serviceName, true);
         
         toast({
-          title: "Authentication Started",
-          description: `Please complete the authentication process for ${serviceName} in the new browser window.`
+          title: "Service Connected",
+          description: `Successfully connected to ${serviceName}.`
         });
       } catch (error) {
         console.error("Failed to connect service:", error);
@@ -88,6 +90,8 @@ export function ServiceSettings({
           description: error instanceof Error ? error.message : `Could not connect to ${serviceName}`,
           variant: "destructive"
         });
+      } finally {
+        setIsAuthenticating(null);
       }
     }
   };
@@ -123,6 +127,7 @@ export function ServiceSettings({
                   (s) => s.service_name === service.name
                 );
                 const isConnected = connection?.is_connected || false;
+                const isAuthenticatingThis = isAuthenticating === service.name;
 
                 return (
                   <Button
@@ -136,13 +141,18 @@ export function ServiceSettings({
                         : "bg-secondary hover:bg-secondary/80"
                     )}
                     variant={isConnected ? "default" : "secondary"}
+                    disabled={isAuthenticating !== null}
                   >
                     <span className="flex items-center gap-2">
                       <span>{service.icon}</span>
                       {service.name}
                     </span>
                     <span className="text-xs">
-                      {isConnected ? "Connected" : "Connect"}
+                      {isAuthenticatingThis 
+                        ? "Connecting..." 
+                        : isConnected 
+                          ? "Connected" 
+                          : "Connect"}
                     </span>
                   </Button>
                 );

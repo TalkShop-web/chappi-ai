@@ -96,46 +96,43 @@ export function useServices() {
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
     
-    try {
-      // Use window.open with proper window features
-      const newAuthWindow = window.open(
-        authUrl,
-        `Connect_${serviceName}_${Date.now()}`, // Unique name prevents reusing the same window
-        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`
-      );
-      
-      if (!newAuthWindow) {
-        throw new Error("Popup blocked. Please allow popups for this site and try again.");
-      }
-      
-      // Focus the new window
-      newAuthWindow.focus();
-      setAuthWindow(newAuthWindow);
-      
-      return new Promise((resolve, reject) => {
-        // Set up an interval to check if the window is closed
-        authCheckIntervalRef.current = window.setInterval(() => {
-          if (newAuthWindow.closed) {
+    // Use window.open with proper window features
+    // The key issue here - make sure we're opening the window correctly
+    const newWindow = window.open(
+      authUrl,
+      `Connect_${serviceName}_${Date.now()}`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes,location=yes`
+    );
+    
+    if (!newWindow) {
+      throw new Error("Popup blocked. Please allow popups for this site and try again.");
+    }
+    
+    // Set window globally
+    setAuthWindow(newWindow);
+    
+    // Make sure the window gets focus
+    newWindow.focus();
+    
+    // Return a promise that resolves when the window is closed
+    return new Promise((resolve) => {
+      // Set up an interval to check if the window is closed
+      authCheckIntervalRef.current = window.setInterval(() => {
+        try {
+          // This will throw an error if the window is closed
+          if (newWindow.closed) {
             clearAuthCheckInterval();
             setAuthWindow(null);
             resolve();
           }
-        }, 500);
-        
-        // For this demo version, we'll resolve after a timeout if the window remains open
-        // In a real OAuth implementation, you would listen for a redirect to your callback URL
-        setTimeout(() => {
-          if (!newAuthWindow.closed) {
-            clearAuthCheckInterval();
-            // Don't close the window automatically, let the user close it when they're done
-            resolve();
-          }
-        }, 30000); // 30 seconds timeout
-      });
-    } catch (error) {
-      console.error("Failed to open auth window:", error);
-      throw error;
-    }
+        } catch (e) {
+          // Window is probably closed or access is denied
+          clearAuthCheckInterval();
+          setAuthWindow(null);
+          resolve();
+        }
+      }, 500);
+    });
   }, [authWindow, clearAuthCheckInterval]);
 
   const updateService = useMutation({

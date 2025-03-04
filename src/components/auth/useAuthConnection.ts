@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { checkSupabaseConnection, ConnectionCheckResult } from '@/lib/supabase'
-import { withTimeout } from '@/utils/connectionUtils'
+import { withTimeout, retryWithBackoff } from '@/utils/connectionUtils'
 
 type ConnectionStatusType = 'testing' | 'connected' | 'disconnected' | 'partial'
 
@@ -25,7 +25,11 @@ export function useAuthConnection(isOpen: boolean) {
     try {
       console.log("Testing connection to Supabase...");
       
-      const result = await withTimeout<ConnectionCheckResult>(checkSupabaseConnection(), 5000);
+      // Use retry with backoff for more robust connection testing
+      const result = await retryWithBackoff(
+        async () => withTimeout<ConnectionCheckResult>(checkSupabaseConnection(), 5000),
+        1 // Just 1 retry for connection test (to avoid too much delay)
+      );
       
       console.log("Connection test result:", result);
       
@@ -41,10 +45,18 @@ export function useAuthConnection(isOpen: boolean) {
       }
     } catch (error) {
       console.error("Connection test error:", error);
+      
+      // Display specific error message for timeout
+      const isTimeout = error instanceof Error && 
+        (error.name === 'AbortError' || error.name === 'TimeoutError' || 
+         error.message.includes('timed out') || error.message.includes('timeout'));
+      
       setConnectionStatus('disconnected');
-      setConnectionMessage(error instanceof Error 
-        ? `Connection error: ${error.message}` 
-        : "Connection test failed. Please check your internet connection.");
+      setConnectionMessage(isTimeout
+        ? "Connection test timed out. Server may be slow or unreachable."
+        : error instanceof Error 
+          ? `Connection error: ${error.message}` 
+          : "Connection test failed. Please check your internet connection.");
     }
   }, []);
 
@@ -74,12 +86,13 @@ export function useAuthConnection(isOpen: boolean) {
       console.log("Auth modal opened, testing connection...");
       testConnection();
       
+      // Retry connection tests less frequently to avoid hammering the server
       const intervalId = setInterval(() => {
         if ((connectionStatus === 'disconnected' || connectionStatus === 'partial') && isOpen) {
           console.log("Retrying connection test...");
           testConnection();
         }
-      }, 5000);
+      }, 10000); // Check every 10 seconds instead of 5
       
       return () => clearInterval(intervalId);
     }

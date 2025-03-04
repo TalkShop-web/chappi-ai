@@ -1,7 +1,7 @@
 
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
-import { isNetworkError, withTimeout } from '@/utils/connectionUtils'
+import { isNetworkError, withTimeout, retryWithBackoff } from '@/utils/connectionUtils'
 
 export function useSignUpOperation() {
   const { toast } = useToast()
@@ -26,16 +26,20 @@ export function useSignUpOperation() {
       
       console.log("Sending signup request to Supabase...")
       
-      const response = await withTimeout(
-        supabase.auth.signUp({ 
-          email, 
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-            captchaToken: undefined
-          }
-        }),
-        15000 // Increased timeout to 15 seconds
+      // Use retry with backoff for network resilience
+      const response = await retryWithBackoff(
+        async () => withTimeout(
+          supabase.auth.signUp({ 
+            email, 
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+              captchaToken: undefined
+            }
+          }),
+          20000 // Increased timeout to 20 seconds
+        ),
+        2 // Max 2 retries
       );
       
       if (response.error) {
@@ -78,7 +82,7 @@ export function useSignUpOperation() {
       console.error("Signup process error:", error)
       
       // Better network error detection
-      if (error instanceof Error && (isNetworkError(error) || !navigator.onLine)) {
+      if (error instanceof Error && (error.message === 'Failed to fetch' || isNetworkError(error) || !navigator.onLine)) {
         setIsConnected(false)
         toast({
           title: "Connection Error",

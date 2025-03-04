@@ -1,7 +1,7 @@
 
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
-import { isNetworkError, withTimeout } from '@/utils/connectionUtils'
+import { isNetworkError, withTimeout, retryWithBackoff } from '@/utils/connectionUtils'
 
 export function useSignInOperation() {
   const { toast } = useToast()
@@ -26,15 +26,19 @@ export function useSignInOperation() {
       
       console.log("Sending sign in request to Supabase...")
       
-      const response = await withTimeout(
-        supabase.auth.signInWithPassword({ 
-          email, 
-          password,
-          options: {
-            captchaToken: undefined
-          }
-        }),
-        15000 // Increased timeout to 15 seconds
+      // Use retry with backoff for network resilience
+      const response = await retryWithBackoff(
+        async () => withTimeout(
+          supabase.auth.signInWithPassword({ 
+            email, 
+            password,
+            options: {
+              captchaToken: undefined
+            }
+          }),
+          20000 // Increased timeout to 20 seconds
+        ),
+        2 // Max 2 retries
       );
       
       if (response.error) {
@@ -71,13 +75,15 @@ export function useSignInOperation() {
       console.error("Sign in error:", error)
       
       // Check explicitly for network errors
-      if (error instanceof Error && (isNetworkError(error) || !navigator.onLine)) {
-        setIsConnected(false)
-        toast({
-          title: "Connection Error",
-          description: "Unable to connect to authentication service. Please check your internet connection and try again.",
-          variant: "destructive"
-        })
+      if (error instanceof Error) {
+        if (error.message === 'Failed to fetch' || isNetworkError(error) || !navigator.onLine) {
+          setIsConnected(false)
+          toast({
+            title: "Connection Error",
+            description: "Unable to connect to authentication service. Please check your internet connection and try again.",
+            variant: "destructive"
+          })
+        }
       }
       
       throw error

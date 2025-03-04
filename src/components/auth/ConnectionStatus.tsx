@@ -11,7 +11,12 @@ interface ConnectionStatusProps {
 }
 
 export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusProps) {
-  switch (status) {
+  // Ensure we always have a valid status to prevent rendering issues
+  const safeStatus: ConnectionStatusType = ['testing', 'connected', 'disconnected', 'partial'].includes(status) 
+    ? status 
+    : 'disconnected';
+    
+  switch (safeStatus) {
     case 'connected':
       return (
         <div className="flex items-center gap-2 p-3 rounded-md text-sm bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
@@ -23,12 +28,16 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
       return (
         <div className="flex items-center gap-2 p-3 rounded-md text-sm bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
           <ServerOff className="h-4 w-4" />
-          {message || "Partial connection to services"}
+          <span className="flex-1">{message || "Partial connection to services"}</span>
           <Button 
             variant="outline" 
             size="sm" 
             className="ml-auto h-7" 
-            onClick={onRetry}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRetry();
+            }}
           >
             Retry
           </Button>
@@ -45,7 +54,11 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
             variant="outline" 
             size="sm" 
             className="h-7" 
-            onClick={onRetry}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRetry();
+            }}
           >
             Cancel
           </Button>
@@ -56,14 +69,18 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
       return (
         <div className="flex items-center gap-2 p-3 rounded-md text-sm bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
           <WifiOff className="h-4 w-4" />
-          <div className="flex-1">
+          <span className="flex-1">
             {message || "Not connected to server"}
-          </div>
+          </span>
           <Button 
             variant="outline" 
             size="sm" 
             className="h-7" 
-            onClick={onRetry}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRetry();
+            }}
           >
             Retry
           </Button>

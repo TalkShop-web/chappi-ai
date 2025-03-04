@@ -80,6 +80,13 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       console.error('Auth error:', error)
       
       if (error instanceof Error) {
+        // Show user-friendly error message
+        toast({
+          title: isSignUp ? "Sign up failed" : "Sign in failed",
+          description: error.message || "An error occurred during authentication",
+          variant: "destructive"
+        });
+        
         if (isNetworkError(error)) {
           // Update connection status if network error is detected
           testConnection()
@@ -95,8 +102,9 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) onClose();
-      if (open) {
+      if (!open) {
+        onClose();
+      } else {
         setRetryCount(0);
         testConnection();
       }

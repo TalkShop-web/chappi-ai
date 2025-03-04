@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react'
 import { checkSupabaseConnection, ConnectionCheckResult } from '@/lib/supabase'
 import { withTimeout, retryWithBackoff, pingConnection } from '@/utils/connectionUtils'
@@ -12,6 +13,8 @@ export function useAuthConnection(isOpen: boolean) {
 
   // Memoize the testConnection function to prevent recreation in useEffect dependencies
   const testConnection = useCallback(async () => {
+    if (!isOpen) return; // Don't test if modal is closed
+    
     setConnectionStatus('testing');
     setTestingAborted(false);
     
@@ -40,7 +43,7 @@ export function useAuthConnection(isOpen: boolean) {
         return;
       }
       
-      console.log("Quick ping successful, skipping full Supabase connection test...");
+      console.log("Quick ping successful, going to partial mode first");
       
       // Since we have a successful ping, we can consider the connection as partial
       // This avoids the long timeout issues with the full Supabase connection test
@@ -95,7 +98,7 @@ export function useAuthConnection(isOpen: boolean) {
           ? `Connection error: ${error.message}` 
           : "Connection test failed. Please check your internet connection.");
     }
-  }, [testingAborted]);
+  }, [testingAborted, isOpen]);
 
   // Check browser online status first, before testing Supabase connection
   useEffect(() => {
@@ -132,10 +135,13 @@ export function useAuthConnection(isOpen: boolean) {
       }, 15000); // Check every 15 seconds when disconnected
       
       return () => clearInterval(intervalId);
+    } else {
+      // Reset when modal is closed
+      setTestingAborted(true);
     }
   }, [isOpen, connectionStatus, testConnection, testingAborted]);
 
-  const handleRetry = () => {
+  const handleRetry = useCallback(() => {
     if (connectionStatus === 'testing') {
       // If we're testing, abort the test
       setTestingAborted(true);
@@ -147,7 +153,7 @@ export function useAuthConnection(isOpen: boolean) {
       setRetryCount(prev => prev + 1);
       testConnection();
     }
-  };
+  }, [connectionStatus, testConnection]);
 
   return {
     connectionStatus,

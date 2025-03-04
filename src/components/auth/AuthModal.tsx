@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -6,7 +5,8 @@ import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/auth/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, Wifi, WifiOff, ServerOff } from 'lucide-react'
-import { checkSupabaseConnection, supabase, ConnectionCheckResult } from '@/lib/supabase'
+import { checkSupabaseConnection, ConnectionCheckResult } from '@/lib/supabase'
+import { isNetworkError, withTimeout } from '@/utils/connectionUtils'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -75,16 +75,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     try {
       console.log("Testing connection to Supabase...");
       
-      // Set a timeout to prevent hanging
-      const timeoutPromise = new Promise<ConnectionCheckResult>((_, reject) => {
-        setTimeout(() => reject(new Error("Connection test timed out")), 5000);
-      });
-      
-      // Race the connection test against the timeout
-      const result = await Promise.race<ConnectionCheckResult>([
-        checkSupabaseConnection(),
-        timeoutPromise
-      ]);
+      const result = await withTimeout<ConnectionCheckResult>(checkSupabaseConnection(), 5000);
       
       console.log("Connection test result:", result);
       
@@ -97,20 +88,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       } else {
         setConnectionStatus('disconnected');
         setConnectionMessage(result.message || "Connection to our servers failed. Please check your internet connection.");
-      }
-      
-      if (!result.connected) {
-        try {
-          // Simple ping test to verify general connectivity
-          await fetch(`${window.location.origin}/ping-test`, { 
-            method: 'HEAD',
-            mode: 'no-cors',
-            cache: 'no-store'
-          });
-          console.log("Ping test completed");
-        } catch (pingError) {
-          console.error("Direct ping failed:", pingError);
-        }
       }
     } catch (error) {
       console.error("Connection test error:", error);
@@ -150,16 +127,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       console.error('Auth error:', error)
       
       if (error instanceof Error) {
-        const errorMessage = error.message || "Unknown error";
-        if (
-          errorMessage.includes("fetch") || 
-          errorMessage.includes("network") ||
-          errorMessage.includes("Failed to fetch") ||
-          errorMessage.includes("NetworkError") ||
-          errorMessage.includes("connection") ||
-          errorMessage.includes("timeout") ||
-          !navigator.onLine
-        ) {
+        if (isNetworkError(error)) {
           setConnectionStatus('disconnected');
           setConnectionMessage("Network connection issue. Please check your internet connection and try again.");
           setRetryCount(prev => prev + 1);

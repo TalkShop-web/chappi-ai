@@ -1,7 +1,7 @@
-
 import { Provider } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
+import { isNetworkError, withTimeout } from '@/utils/connectionUtils'
 
 // Define the response type to fix TS errors
 interface SupabaseResponse {
@@ -30,26 +30,21 @@ export function useAuthOperations() {
       
       setIsConnected(true) // Optimistically set connected
       
-      const { error, data } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password,
-        options: {
-          captchaToken: undefined, // Make sure no captcha is expected
-        }
-      })
+      const response = await withTimeout(
+        supabase.auth.signInWithPassword({ 
+          email, 
+          password,
+          options: {
+            captchaToken: undefined
+          }
+        }),
+        10000
+      );
       
-      if (error) {
-        console.error("Sign in error:", error)
+      if (response.error) {
+        console.error("Sign in error:", response.error)
         
-        // Check if this is a network error (response code is 0 or message includes network-related terms)
-        const isNetworkError = 
-          (error.status === 0) || 
-          error.message.includes("fetch") || 
-          error.message.includes("network") ||
-          error.message.includes("Failed to fetch") ||
-          !navigator.onLine
-        
-        if (isNetworkError) {
+        if (isNetworkError(response.error)) {
           setIsConnected(false)
           toast({
             title: "Connection Error",
@@ -61,40 +56,31 @@ export function useAuthOperations() {
           setIsConnected(true)
           toast({
             title: "Sign in failed",
-            description: error.message,
+            description: response.error.message,
             variant: "destructive"
           })
         }
         
-        throw error
+        throw response.error
       }
       
-      if (data?.user) {
-        console.log("Sign in successful for:", data.user.email)
+      if (response.data?.user) {
+        console.log("Sign in successful for:", response.data.user.email)
         toast({
           title: "Sign in successful",
-          description: `Welcome back, ${data.user.email}!`,
+          description: `Welcome back, ${response.data.user.email}!`,
         })
       }
     } catch (error) {
       console.error("Sign in error:", error)
       
-      // Check if this is a network error and show appropriate message
-      if (error instanceof Error) {
-        const isNetworkError = 
-          error.message.includes("fetch") || 
-          error.message.includes("network") || 
-          error.message.includes("Failed to fetch") ||
-          !navigator.onLine;
-          
-        if (isNetworkError) {
-          toast({
-            title: "Connection Error",
-            description: "Unable to connect to authentication service. Please check your internet connection.",
-            variant: "destructive"
-          })
-          setIsConnected(false)
-        }
+      if (error instanceof Error && isNetworkError(error)) {
+        toast({
+          title: "Connection Error",
+          description: "Unable to connect to authentication service. Please check your internet connection.",
+          variant: "destructive"
+        })
+        setIsConnected(false)
       }
       
       throw error
@@ -122,36 +108,22 @@ export function useAuthOperations() {
       // Add additional logging to track the request
       console.log("Sending signup request to Supabase...");
       
-      // Set a timeout to detect hanging requests
-      const timeoutPromise = new Promise<SupabaseResponse>((_, reject) => {
-        setTimeout(() => reject(new Error("Request timed out")), 10000);
-      });
+      const response = await withTimeout(
+        supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            captchaToken: undefined
+          }
+        }),
+        10000
+      );
       
-      // Race the actual request against the timeout
-      const signUpPromise = supabase.auth.signUp({ 
-        email, 
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          captchaToken: undefined // Make sure no captcha is expected
-        }
-      });
-      
-      const result = await Promise.race<SupabaseResponse>([signUpPromise, timeoutPromise]);
-      
-      if (result.error) {
-        console.error("Signup error:", result.error)
+      if (response.error) {
+        console.error("Signup error:", response.error)
         
-        // Check if this is a network error
-        const isNetworkError = 
-          (result.error.status === 0) || 
-          result.error.message.includes("fetch") || 
-          result.error.message.includes("network") ||
-          result.error.message.includes("Failed to fetch") ||
-          result.error.message.includes("timeout") ||
-          !navigator.onLine;
-        
-        if (isNetworkError) {
+        if (isNetworkError(response.error)) {
           setIsConnected(false)
           toast({
             title: "Connection Error",
@@ -163,42 +135,31 @@ export function useAuthOperations() {
           setIsConnected(true)
           toast({
             title: "Sign up failed",
-            description: result.error.message,
+            description: response.error.message,
             variant: "destructive"
           })
         }
         
-        throw result.error
+        throw response.error
       }
 
-      console.log("Signup response:", result.data)
+      console.log("Signup response:", response.data)
       
-      if (result.data?.user) {
-        console.log("User created:", result.data.user.email, "Email confirmed:", result.data.user.email_confirmed_at !== null)
+      if (response.data?.user) {
+        console.log("User created:", response.data.user.email, "Email confirmed:", response.data.user.email_confirmed_at !== null)
       }
       
       // Success message even if email confirmation is required
       toast({
         title: "Account created",
-        description: result.data.user && result.data.user.email_confirmed_at !== null 
+        description: response.data.user && response.data.user.email_confirmed_at !== null 
           ? "You can now sign in." 
           : "Please check your email to confirm your account.",
       })
     } catch (error) {
       console.error("Signup process error:", error)
       
-      // Handle timeout errors specifically
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      
-      // Handle network errors specifically
-      const isNetworkError = 
-        errorMessage.includes("fetch") || 
-        errorMessage.includes("network") ||
-        errorMessage.includes("Failed to fetch") ||
-        errorMessage.includes("timeout") ||
-        !navigator.onLine;
-        
-      if (isNetworkError) {
+      if (error instanceof Error && isNetworkError(error)) {
         setIsConnected(false)
         toast({
           title: "Connection Error",
@@ -206,6 +167,7 @@ export function useAuthOperations() {
           variant: "destructive"
         })
       } else {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
         toast({
           title: "Sign up failed",
           description: errorMessage,

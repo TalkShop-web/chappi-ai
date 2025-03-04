@@ -14,27 +14,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
       'X-Client-Info': 'chappi-app'
-    },
-    fetch: (url, options) => {
-      // Use a fetch with timeout
-      const controller = new AbortController();
-      const { signal } = controller;
-      
-      // Set timeout to 10 seconds
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
-      // Add the signal to the options
-      const fetchOptions = { ...options, signal };
-      
-      return fetch(url, fetchOptions)
-        .then(response => {
-          clearTimeout(timeoutId);
-          return response;
-        })
-        .catch(error => {
-          clearTimeout(timeoutId);
-          throw error;
-        });
     }
   }
 })
@@ -61,14 +40,9 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
   try {
     console.log('Testing Supabase connection...')
     
-    // Use a controller to allow timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
+    // First, try a quick auth check which should be faster than DB
     try {
-      // First, try a quick auth check which should be faster than DB
       const authCheck = await supabase.auth.getSession();
-      clearTimeout(timeoutId);
       
       if (authCheck.error) {
         console.error('Auth connection error:', authCheck.error.message);
@@ -79,31 +53,14 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
         };
       }
       
-      // Now try a DB check
-      const { data, error } = await supabase.from('service_connections')
-        .select('count', { count: 'exact', head: true })
-        .limit(1);
-      
-      if (error) {
-        console.error('Database connection error:', error.message);
-        
-        // Auth works but database doesn't
-        return {
-          connected: true,
-          partial: true,
-          error: error,
-          message: 'Connected to authentication but database access is limited'
-        };
-      }
-      
-      console.log('Supabase connection successful');
+      // If we can connect to auth, we're at least partially connected
       return {
         connected: true,
+        partial: true,
         error: null,
-        message: 'Connected to Supabase services'
+        message: 'Connected to authentication service'
       };
     } catch (err) {
-      clearTimeout(timeoutId);
       throw err;
     }
   } catch (error) {

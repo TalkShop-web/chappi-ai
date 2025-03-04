@@ -28,15 +28,9 @@ export function ServiceSettings({
   const [isAuthenticating, setIsAuthenticating] = useState<string | null>(null);
 
   const handleServiceConnect = async (serviceName: AIService['name']) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "You need to be logged in to connect services.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+    // If already authenticating another service, prevent multiple windows
+    if (isAuthenticating) return;
+    
     const currentConnection = serviceConnections?.find(
       (s) => s.service_name === serviceName
     );
@@ -62,19 +56,20 @@ export function ServiceSettings({
         });
       }
     } else {
-      // For connecting services, we'll open the auth window
+      // For connecting services, we'll open the auth window directly
       try {
         setIsAuthenticating(serviceName);
         
-        // Open the auth window
+        // Open the auth window directly, regardless of user authentication
         await initiateAuthFlow(serviceName);
         
-        // If we're here, the auth window was closed
-        // Update the service connection
-        await updateService.mutateAsync({
-          serviceName,
-          isConnected: true,
-        });
+        // Only update database if user is logged in
+        if (user) {
+          await updateService.mutateAsync({
+            serviceName,
+            isConnected: true,
+          });
+        }
         
         // Update the UI state in the parent component
         onConnectService(serviceName, true);

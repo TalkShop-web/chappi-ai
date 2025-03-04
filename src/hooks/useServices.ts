@@ -90,43 +90,35 @@ export function useServices() {
     // Get the appropriate auth URL
     const authUrl = getAuthUrl(serviceName);
     
-    // Open the authentication window
+    // Open the authentication window with specific dimensions
     const width = 800;
     const height = 700;
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
     
-    // Use window.open with proper window features
-    // The key issue here - make sure we're opening the window correctly
+    // Create a random window name to avoid caching issues
+    const windowName = `Connect_${serviceName}_${Date.now()}`;
+    
+    // Open the window with all necessary parameters
     const newWindow = window.open(
       authUrl,
-      `Connect_${serviceName}_${Date.now()}`,
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes,location=yes`
+      windowName,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes,toolbar=yes,menubar=yes,location=yes`
     );
     
     if (!newWindow) {
       throw new Error("Popup blocked. Please allow popups for this site and try again.");
     }
     
-    // Set window globally
+    // Set window globally and focus it
     setAuthWindow(newWindow);
-    
-    // Make sure the window gets focus
     newWindow.focus();
     
     // Return a promise that resolves when the window is closed
     return new Promise((resolve) => {
       // Set up an interval to check if the window is closed
       authCheckIntervalRef.current = window.setInterval(() => {
-        try {
-          // This will throw an error if the window is closed
-          if (newWindow.closed) {
-            clearAuthCheckInterval();
-            setAuthWindow(null);
-            resolve();
-          }
-        } catch (e) {
-          // Window is probably closed or access is denied
+        if (newWindow.closed) {
           clearAuthCheckInterval();
           setAuthWindow(null);
           resolve();

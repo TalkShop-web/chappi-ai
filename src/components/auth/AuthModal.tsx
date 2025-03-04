@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/auth/AuthContext'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, AlertCircle, Wifi, WifiOff, ServerOff } from 'lucide-react'
+import { Loader2, Wifi, WifiOff, ServerOff } from 'lucide-react'
 import { checkSupabaseConnection, supabase } from '@/lib/supabase'
 
 interface AuthModalProps {
@@ -23,12 +24,35 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const { signIn, signUp } = useAuth()
   const { toast } = useToast()
 
+  // Check browser online status first, before testing Supabase connection
+  useEffect(() => {
+    const handleOnlineStatusChange = () => {
+      if (!navigator.onLine) {
+        setConnectionStatus('disconnected');
+        setConnectionMessage("Your device appears to be offline. Please check your internet connection.");
+      } else if (connectionStatus === 'disconnected') {
+        // Only retest if we were previously disconnected
+        testConnection();
+      }
+    };
+
+    window.addEventListener('online', handleOnlineStatusChange);
+    window.addEventListener('offline', handleOnlineStatusChange);
+
+    return () => {
+      window.removeEventListener('online', handleOnlineStatusChange);
+      window.removeEventListener('offline', handleOnlineStatusChange);
+    };
+  }, [connectionStatus]);
+
   useEffect(() => {
     if (isOpen) {
+      console.log("Auth modal opened, testing connection...");
       testConnection();
       
       const intervalId = setInterval(() => {
         if (connectionStatus === 'disconnected' || connectionStatus === 'partial') {
+          console.log("Retrying connection test...");
           testConnection();
         }
       }, 5000);
@@ -40,9 +64,28 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const testConnection = async () => {
     setConnectionStatus('testing');
     
+    // First check browser's online status
+    if (!navigator.onLine) {
+      console.log("Browser reports device is offline");
+      setConnectionStatus('disconnected');
+      setConnectionMessage("Your device appears to be offline. Please check your internet connection.");
+      return;
+    }
+    
     try {
       console.log("Testing connection to Supabase...");
-      const result = await checkSupabaseConnection();
+      
+      // Set a timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Connection test timed out")), 5000);
+      });
+      
+      // Race the connection test against the timeout
+      const result = await Promise.race([
+        checkSupabaseConnection(),
+        timeoutPromise
+      ]);
+      
       console.log("Connection test result:", result);
       
       if (result.partial) {
@@ -58,6 +101,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       
       if (!result.connected) {
         try {
+          // Simple ping test to verify general connectivity
           const response = await fetch(`${window.location.origin}/ping-test`, { 
             method: 'HEAD',
             mode: 'no-cors',
@@ -71,11 +115,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     } catch (error) {
       console.error("Connection test error:", error);
       setConnectionStatus('disconnected');
-      setConnectionMessage("Connection test failed. Please check your internet connection.");
+      setConnectionMessage(error instanceof Error 
+        ? `Connection error: ${error.message}` 
+        : "Connection test failed. Please check your internet connection.");
     }
   };
 
   const handleRetry = () => {
+    console.log("Manual retry requested");
     setRetryCount(prev => prev + 1);
     testConnection();
   };
@@ -109,7 +156,9 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           errorMessage.includes("network") ||
           errorMessage.includes("Failed to fetch") ||
           errorMessage.includes("NetworkError") ||
-          errorMessage.includes("connection")
+          errorMessage.includes("connection") ||
+          errorMessage.includes("timeout") ||
+          !navigator.onLine
         ) {
           setConnectionStatus('disconnected');
           setConnectionMessage("Network connection issue. Please check your internet connection and try again.");

@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = 'https://38a9e9b6-f1cf-4510-aad9-31f7ae0d3fab.supabase.co'
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IjM4YTllOWI2LWYxY2YtNDUxMC1hYWQ5LTMxZjdhZTBkM2ZhYiIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzEwMzMyMTQ3LCJleHAiOjIwMjU5MDgxNDd9.bJ5Ks9ZXXOIaRdNDKEooxXdeMRTyUWt9tEKh3UwSr9k'
 
-// Create Supabase client with fetch configuration to ensure consistent behavior
+// Create Supabase client with fetch configuration and timeout
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
@@ -15,62 +15,100 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     headers: {
       'X-Client-Info': 'chappi-app'
     },
-    fetch: fetch.bind(globalThis)
+    fetch: (...args) => {
+      // Use a fetch with timeout
+      const controller = new AbortController();
+      const { signal } = controller;
+      
+      // Set timeout to 10 seconds
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      return fetch(...args, { signal })
+        .then(response => {
+          clearTimeout(timeoutId);
+          return response;
+        })
+        .catch(error => {
+          clearTimeout(timeoutId);
+          throw error;
+        });
+    }
   }
 })
 
-// Improved connection check function with better error reporting
+// Improved connection check function with better error reporting and timeout
 export const checkSupabaseConnection = async () => {
+  if (!navigator.onLine) {
+    console.error('Browser reports device is offline');
+    return {
+      connected: false,
+      error: new Error('Device offline'),
+      message: 'Your device appears to be offline. Please check your internet connection.'
+    };
+  }
+
   try {
     console.log('Testing Supabase connection...')
     
-    // First, try to ping the API without authentication
-    const { data, error } = await supabase.from('service_connections').select('count', { count: 'exact', head: true })
+    // Use a controller to allow timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     
-    if (error) {
-      console.error('Supabase connection error:', error.message, error.code)
+    try {
+      // First, try a quick auth check which should be faster than DB
+      const authCheck = await supabase.auth.getSession();
+      clearTimeout(timeoutId);
       
-      // Try a basic auth endpoint as fallback
-      try {
-        const { error: authError } = await supabase.auth.getSession()
-        if (authError) {
-          console.error('Auth connection error:', authError.message, authError.code)
-          return {
-            connected: false,
-            error: authError,
-            message: `Auth connection failed: ${authError.message}`
-          }
-        }
+      if (authCheck.error) {
+        console.error('Auth connection error:', authCheck.error.message);
+        return {
+          connected: false,
+          error: authCheck.error,
+          message: `Unable to connect to authentication service: ${authCheck.error.message}`
+        };
+      }
+      
+      // Now try a DB check
+      const { data, error } = await supabase.from('service_connections')
+        .select('count', { count: 'exact', head: true })
+        .limit(1);
+      
+      if (error) {
+        console.error('Database connection error:', error.message);
         
         // Auth works but database doesn't
         return {
           connected: true,
           partial: true,
           error: error,
-          message: 'Connected to auth services but database access failed'
-        }
-      } catch (authCatchError) {
-        console.error('Auth connection catch error:', authCatchError)
-        return {
-          connected: false,
-          error: authCatchError,
-          message: 'Failed to connect to all Supabase services'
-        }
+          message: 'Connected to authentication but database access is limited'
+        };
       }
-    }
-    
-    console.log('Supabase connection successful')
-    return {
-      connected: true,
-      error: null,
-      message: 'Connected to all Supabase services'
+      
+      console.log('Supabase connection successful');
+      return {
+        connected: true,
+        error: null,
+        message: 'Connected to Supabase services'
+      };
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
     }
   } catch (error) {
-    console.error('Supabase connection catch error:', error)
+    console.error('Supabase connection error:', error);
+    
+    // Distinguish between timeout and other errors
+    const isTimeoutError = error instanceof DOMException && error.name === 'AbortError';
+    
     return {
       connected: false,
       error: error,
-      message: error instanceof Error ? error.message : 'Unknown connection error'
-    }
+      message: isTimeoutError 
+        ? 'Connection timed out. Server may be unavailable or your connection is slow.'
+        : error instanceof Error 
+          ? error.message 
+          : 'Unknown connection error'
+    };
   }
 }

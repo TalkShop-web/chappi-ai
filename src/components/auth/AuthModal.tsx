@@ -28,17 +28,9 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       if (isSignUp) {
         console.log(`Attempting to sign up with email: ${email}`)
         await signUp(email, password)
-        toast({
-          title: "Verification email sent",
-          description: "Please check your email to confirm your account",
-        })
         // Don't close modal on signup as verification may be required
       } else {
         await signIn(email, password)
-        toast({
-          title: "Sign in successful",
-          description: "Welcome back!",
-        })
         onClose()
       }
     } catch (error) {
@@ -54,7 +46,9 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) onClose();
+    }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isSignUp ? 'Create an account' : 'Sign in'}</DialogTitle>

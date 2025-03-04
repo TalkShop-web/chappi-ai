@@ -47,8 +47,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log("Attempting to sign in with:", email)
       const { error, data } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
+        console.error("Sign in error:", error)
         toast({
           title: "Sign in failed",
           description: error.message,
@@ -57,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error
       }
       if (data?.user) {
+        console.log("Sign in successful for:", data.user.email)
         toast({
           title: "Sign in successful",
           description: `Welcome back, ${data.user.email}!`,
@@ -91,10 +94,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("Signup response:", data)
       
+      if (data?.user) {
+        console.log("User created:", data.user.email, "Email confirmed:", data.user.email_confirmed_at !== null)
+      }
+      
       // Success message even if email confirmation is required
       toast({
         title: "Account created",
-        description: data.user ? "You can now sign in." : "Please check your email to confirm your account.",
+        description: data.user && data.user.email_confirmed_at !== null 
+          ? "You can now sign in." 
+          : "Please check your email to confirm your account.",
       })
     } catch (error) {
       console.error("Signup process error:", error)

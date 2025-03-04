@@ -39,7 +39,7 @@ export function useSignInOperation() {
       
       console.log("Sending sign in request to Supabase...")
       
-      // Use retry with backoff for network resilience
+      // Use retry with backoff for network resilience - with increased timeout and retries
       const response = await retryWithBackoff(
         async () => withTimeout(
           supabase.auth.signInWithPassword({ 
@@ -49,11 +49,11 @@ export function useSignInOperation() {
               captchaToken: undefined
             }
           }),
-          30000 // 30 seconds timeout for sign in
+          60000 // 60 seconds timeout for sign in
         ),
-        2, // 2 retries max
-        1000, // Start with 1 second delay
-        8000, // Max 8 second delay
+        3, // 3 retries max
+        2000, // Start with 2 second delay
+        15000, // Max 15 second delay
         isNetworkError
       );
       

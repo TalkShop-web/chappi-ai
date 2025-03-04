@@ -59,9 +59,9 @@ export const createTimeoutPromise = <T>(ms: number, errorMessage = "Request time
 };
 
 /**
- * Race a promise against a timeout
+ * Race a promise against a timeout - with increased default timeout
  */
-export const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+export const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number = 60000): Promise<T> => {
   const timeoutPromise = createTimeoutPromise<T>(timeoutMs, "Request timed out. Please check your connection and try again.");
   return Promise.race([promise, timeoutPromise]);
 };
@@ -73,8 +73,8 @@ export const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Pr
 export const retryWithBackoff = async <T>(
   fn: () => Promise<T>,
   retries = 3,
-  initialDelay = 500,
-  maxDelay = 5000,
+  initialDelay = 1000,
+  maxDelay = 10000,
   shouldRetry = isNetworkError
 ): Promise<T> => {
   let lastError: any;
@@ -82,8 +82,6 @@ export const retryWithBackoff = async <T>(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      // Add some randomness to prevent all clients retrying simultaneously
-      const jitter = Math.random() * 100;
       return await fn();
     } catch (error) {
       console.error(`Attempt ${attempt + 1}/${retries + 1} failed:`, error);
@@ -116,27 +114,56 @@ export const retryWithBackoff = async <T>(
 };
 
 /**
- * Regular ping to check connection status
+ * Regular ping to check connection status - more reliable implementation
  * @returns Promise that resolves to true if we have connectivity
  */
 export const pingConnection = async (): Promise<boolean> => {
   if (!navigator.onLine) return false;
   
   try {
-    // First try a faster HEAD request to our own domain
+    // First try a simple HEAD request to check connectivity
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout for reliability
     
-    const response = await fetch('/', {
-      method: 'HEAD',
-      cache: 'no-store',
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    return response.ok;
+    try {
+      const response = await fetch('/', {
+        method: 'HEAD',
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch (err) {
+      // Fall back to img ping if HEAD request fails
+      console.log('HEAD ping failed, trying image ping...');
+      
+      // Use an image ping as fallback (more reliable through firewalls)
+      return new Promise((resolve) => {
+        const img = new Image();
+        
+        // Set a timeout to avoid hanging
+        const imgTimeoutId = setTimeout(() => {
+          img.onload = img.onerror = null;
+          resolve(false);
+        }, 5000);
+        
+        img.onload = () => {
+          clearTimeout(imgTimeoutId);
+          resolve(true);
+        };
+        
+        img.onerror = () => {
+          clearTimeout(imgTimeoutId);
+          resolve(false);
+        };
+        
+        // Use a cachebuster query param to avoid browser caching
+        img.src = `/favicon.ico?_=${Date.now()}`;
+      });
+    }
   } catch (err) {
-    console.log('Ping failed:', err);
+    console.log('All ping methods failed:', err);
     return false;
   }
 };

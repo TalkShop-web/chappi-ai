@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = 'https://38a9e9b6-f1cf-4510-aad9-31f7ae0d3fab.supabase.co'
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IjM4YTllOWI2LWYxY2YtNDUxMC1hYWQ5LTMxZjdhZTBkM2ZhYiIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzEwMzMyMTQ3LCJleHAiOjIwMjU5MDgxNDd9.bJ5Ks9ZXXOIaRdNDKEooxXdeMRTyUWt9tEKh3UwSr9k'
 
-// Custom fetch function with retry logic and longer timeout
+// Custom fetch function with improved retry logic and longer timeout
 const customFetch = (url: string, options: RequestInit): Promise<Response> => {
   return new Promise((resolve, reject) => {
     const MAX_RETRIES = 3;
@@ -12,7 +12,7 @@ const customFetch = (url: string, options: RequestInit): Promise<Response> => {
     
     const attemptFetch = () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
       
       fetch(url, {
         ...options,
@@ -32,7 +32,7 @@ const customFetch = (url: string, options: RequestInit): Promise<Response> => {
           
         if (isNetworkError && retryCount < MAX_RETRIES) {
           retryCount++;
-          const delay = Math.min(1000 * Math.pow(2, retryCount) + Math.random() * 100, 10000);
+          const delay = Math.min(1000 * Math.pow(2, retryCount) + Math.random() * 100, 15000);
           console.log(`Fetch attempt ${retryCount} failed, retrying in ${Math.round(delay)}ms...`);
           
           setTimeout(attemptFetch, delay);
@@ -58,6 +58,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       'X-Client-Info': 'chappi-app'
     },
     fetch: customFetch
+  },
+  // Increase timeouts for all operations
+  realtime: {
+    timeout: 60000 // 60 seconds
   }
 })
 
@@ -93,7 +97,7 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
         setTimeout(() => reject({
           data: null, 
           error: new Error('Connection timed out')
-        }), 5000);
+        }), 15000); // Increased timeout to 15 seconds
       });
       
       // Using Promise.race to implement timeout

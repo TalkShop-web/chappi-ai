@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { checkSupabaseConnection, ConnectionCheckResult } from '@/lib/supabase'
 import { withTimeout, retryWithBackoff, pingConnection } from '@/utils/connectionUtils'
 
@@ -10,104 +9,112 @@ export function useAuthConnection(isOpen: boolean) {
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const [testingAborted, setTestingAborted] = useState(false)
+  
+  const isMountedRef = useRef(true);
+  
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-  // Memoize the testConnection function to prevent recreation in useEffect dependencies
+  const safeSetConnectionStatus = useCallback((status: ConnectionStatusType) => {
+    if (isMountedRef.current) {
+      setConnectionStatus(status);
+    }
+  }, []);
+  
+  const safeSetConnectionMessage = useCallback((message: string | null) => {
+    if (isMountedRef.current) {
+      setConnectionMessage(message);
+    }
+  }, []);
+  
   const testConnection = useCallback(async () => {
     if (!isOpen) return; // Don't test if modal is closed
     
-    setConnectionStatus('testing');
+    safeSetConnectionStatus('testing');
     setTestingAborted(false);
     
-    // First check browser's online status
     if (!navigator.onLine) {
       console.log("Browser reports device is offline");
-      setConnectionStatus('disconnected');
-      setConnectionMessage("Your device appears to be offline. Please check your internet connection.");
+      safeSetConnectionStatus('disconnected');
+      safeSetConnectionMessage("Your device appears to be offline. Please check your internet connection.");
       return;
     }
     
     try {
-      // First try a quick ping - this is faster than the full Supabase check
       const isConnected = await pingConnection();
       
-      // If the testing was aborted, don't update status
-      if (testingAborted) {
+      if (testingAborted || !isMountedRef.current) {
         console.log("Connection test was aborted");
         return;
       }
       
       if (!isConnected) {
         console.log("Quick ping test failed - network appears down");
-        setConnectionStatus('disconnected');
-        setConnectionMessage("Unable to reach our servers. Your connection appears to be down or very slow.");
+        safeSetConnectionStatus('disconnected');
+        safeSetConnectionMessage("Unable to reach our servers. Your connection appears to be down or very slow.");
         return;
       }
       
       console.log("Quick ping successful, going to partial mode first");
       
-      // Since we have a successful ping, we can consider the connection as partial
-      // This avoids the long timeout issues with the full Supabase connection test
-      setConnectionStatus('partial');
-      setConnectionMessage("Connected to server, but full authentication status is pending.");
+      safeSetConnectionStatus('partial');
+      safeSetConnectionMessage("Connected to server, but full authentication status is pending.");
       
-      // Attempt the full Supabase check, but don't block UI
       setTimeout(async () => {
         try {
-          if (testingAborted) return;
+          if (testingAborted || !isMountedRef.current) return;
           
-          // Perform a simple check against Supabase, but with a shorter timeout
           const result = await withTimeout<ConnectionCheckResult>(
             checkSupabaseConnection(), 
-            5000 // 5 second timeout
+            5000
           );
           
-          if (testingAborted) return;
+          if (testingAborted || !isMountedRef.current) return;
           
           if (result.connected) {
-            setConnectionStatus('connected');
-            setConnectionMessage(null);
+            safeSetConnectionStatus('connected');
+            safeSetConnectionMessage(null);
           } else if (result.partial) {
-            setConnectionStatus('partial');
-            setConnectionMessage(result.message);
+            safeSetConnectionStatus('partial');
+            safeSetConnectionMessage(result.message);
           } else {
-            setConnectionStatus('disconnected');
-            setConnectionMessage(result.message);
+            safeSetConnectionStatus('disconnected');
+            safeSetConnectionMessage(result.message);
           }
         } catch (error) {
-          if (testingAborted) return;
+          if (testingAborted || !isMountedRef.current) return;
           
           console.log("Background Supabase check failed, staying in partial mode", error);
-          // Keep the partial status, don't change to disconnected
         }
       }, 100);
       
     } catch (error) {
-      if (testingAborted) return;
+      if (testingAborted || !isMountedRef.current) return;
       
       console.error("Connection test error:", error);
       
-      // Display specific error message for timeout
       const isTimeout = error instanceof Error && 
         (error.name === 'AbortError' || error.name === 'TimeoutError' || 
          error.message.includes('timed out') || error.message.includes('timeout'));
       
-      setConnectionStatus('disconnected');
-      setConnectionMessage(isTimeout
+      safeSetConnectionStatus('disconnected');
+      safeSetConnectionMessage(isTimeout
         ? "Connection test timed out. Server may be slow or unreachable."
         : error instanceof Error 
           ? `Connection error: ${error.message}` 
           : "Connection test failed. Please check your internet connection.");
     }
-  }, [testingAborted, isOpen]);
+  }, [isOpen, safeSetConnectionMessage, safeSetConnectionStatus, testingAborted]);
 
-  // Check browser online status first, before testing Supabase connection
   useEffect(() => {
     const handleOnlineStatusChange = () => {
       if (!navigator.onLine) {
-        setConnectionStatus('disconnected');
-        setConnectionMessage("Your device appears to be offline. Please check your internet connection.");
+        safeSetConnectionStatus('disconnected');
+        safeSetConnectionMessage("Your device appears to be offline. Please check your internet connection.");
       } else if (connectionStatus === 'disconnected' && isOpen) {
-        // Only retest if we were previously disconnected and modal is open
         testConnection();
       }
     };
@@ -119,46 +126,45 @@ export function useAuthConnection(isOpen: boolean) {
       window.removeEventListener('online', handleOnlineStatusChange);
       window.removeEventListener('offline', handleOnlineStatusChange);
     };
-  }, [connectionStatus, isOpen, testConnection]);
+  }, [connectionStatus, isOpen, testConnection, safeSetConnectionStatus, safeSetConnectionMessage]);
 
   useEffect(() => {
     if (isOpen) {
       console.log("Auth modal opened, testing connection...");
       testConnection();
       
-      // Retry connection tests less frequently to avoid hammering the server
       const intervalId = setInterval(() => {
-        if ((connectionStatus === 'disconnected') && isOpen && !testingAborted) {
+        if ((connectionStatus === 'disconnected') && isOpen && !testingAborted && isMountedRef.current) {
           console.log("Retrying connection test...");
           testConnection();
         }
-      }, 15000); // Check every 15 seconds when disconnected
+      }, 15000);
       
-      return () => clearInterval(intervalId);
+      return () => {
+        clearInterval(intervalId);
+        setTestingAborted(true);
+      };
     } else {
-      // Reset when modal is closed
       setTestingAborted(true);
     }
   }, [isOpen, connectionStatus, testConnection, testingAborted]);
 
   const handleRetry = useCallback(() => {
     if (connectionStatus === 'testing') {
-      // If we're testing, abort the test
       setTestingAborted(true);
-      setConnectionStatus('disconnected');
-      setConnectionMessage("Connection test canceled.");
+      safeSetConnectionStatus('disconnected');
+      safeSetConnectionMessage("Connection test canceled.");
     } else {
-      // Otherwise start a new test
       console.log("Manual retry requested");
       setRetryCount(prev => prev + 1);
       testConnection();
     }
-  }, [connectionStatus, testConnection]);
+  }, [connectionStatus, testConnection, safeSetConnectionStatus, safeSetConnectionMessage]);
 
   return {
     connectionStatus,
     connectionMessage,
-    setConnectionMessage,
+    setConnectionMessage: safeSetConnectionMessage,
     testConnection,
     handleRetry,
     retryCount,

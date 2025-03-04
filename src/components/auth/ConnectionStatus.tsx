@@ -1,6 +1,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Loader2, Wifi, WifiOff, ServerOff } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 type ConnectionStatusType = 'testing' | 'connected' | 'disconnected' | 'partial'
 
@@ -15,6 +16,27 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
   const safeStatus: ConnectionStatusType = ['testing', 'connected', 'disconnected', 'partial'].includes(status) 
     ? status 
     : 'disconnected';
+  
+  // Prevent excessive re-renders and repeated calls by implementing a debounced retry
+  const [isRetrying, setIsRetrying] = useState(false);
+  
+  useEffect(() => {
+    // Reset retry state when status changes
+    setIsRetrying(false);
+  }, [status]);
+  
+  const handleRetry = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isRetrying) return; // Prevent multiple rapid clicks
+    
+    setIsRetrying(true);
+    onRetry();
+    
+    // Auto-reset after a delay (for UI feedback)
+    setTimeout(() => setIsRetrying(false), 500);
+  };
     
   switch (safeStatus) {
     case 'connected':
@@ -32,14 +54,11 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
           <Button 
             variant="outline" 
             size="sm" 
-            className="ml-auto h-7" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onRetry();
-            }}
+            className="ml-auto h-7"
+            disabled={isRetrying}
+            onClick={handleRetry}
           >
-            Retry
+            {isRetrying ? "Retrying..." : "Retry"}
           </Button>
         </div>
       );
@@ -53,12 +72,8 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
           <Button 
             variant="outline" 
             size="sm" 
-            className="h-7" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onRetry();
-            }}
+            className="h-7"
+            onClick={handleRetry}
           >
             Cancel
           </Button>
@@ -75,14 +90,11 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
           <Button 
             variant="outline" 
             size="sm" 
-            className="h-7" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onRetry();
-            }}
+            className="h-7"
+            disabled={isRetrying}
+            onClick={handleRetry}
           >
-            Retry
+            {isRetrying ? "Retrying..." : "Retry"}
           </Button>
         </div>
       );

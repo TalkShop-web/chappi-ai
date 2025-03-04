@@ -85,12 +85,15 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
     
     // First, try a quick auth check which should be faster than DB
     try {
-      const timeoutPromise = new Promise<any>((_, reject) => {
-        setTimeout(() => reject(new Error('Connection timed out')), 5000);
+      // Fixed: getSession() doesn't accept any arguments
+      const authCheckPromise = supabase.auth.getSession();
+      
+      // Using a separate timeout promise for race condition
+      const timeoutPromise = new Promise<{error: Error}>((_, reject) => {
+        setTimeout(() => reject({error: new Error('Connection timed out')}), 5000);
       });
       
       // Using Promise.race to implement timeout
-      const authCheckPromise = supabase.auth.getSession();
       const result = await Promise.race([authCheckPromise, timeoutPromise]);
       
       if (result.error) {
@@ -110,9 +113,19 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
         message: 'Connected to authentication service'
       };
     } catch (err: any) {
+      // Special handling for timeout errors
+      if (err && err.error && err.error.message === 'Connection timed out') {
+        return {
+          connected: false,
+          partial: true, // Consider it partially connected even if auth times out
+          error: err.error,
+          message: 'Connection is slow. Basic functionality may work, but some features might be limited.'
+        };
+      }
+      
       // Specific error handling for various network issues
       if (err) {
-        if (err.name === 'AbortError' || err.message.includes('timed out')) {
+        if (err.name === 'AbortError' || (err.message && err.message.includes('timed out'))) {
           return {
             connected: false,
             partial: true, // Consider it partially connected even if auth times out

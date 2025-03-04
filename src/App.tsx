@@ -24,6 +24,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/auth/callback" element={<Index />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <Toaster />

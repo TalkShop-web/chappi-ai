@@ -23,7 +23,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const { signIn, signUp } = useAuth()
   const { toast } = useToast()
 
-  // Test connection when modal opens
+  // Test connection when modal opens or when retry is clicked
   useEffect(() => {
     if (isOpen) {
       testConnection();
@@ -35,11 +35,18 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setNetworkError(null);
     
     try {
+      console.log("Testing connection to Supabase...");
       const result = await checkSupabaseConnection();
+      console.log("Connection test result:", result);
+      
       setConnectionStatus(result.connected ? 'connected' : 'disconnected');
       
       if (!result.connected) {
-        setNetworkError("We're having trouble connecting to our servers. Please check your internet connection.");
+        const errorMessage = result.error instanceof Error 
+          ? result.error.message 
+          : "Connection to our servers failed. Please check your internet connection.";
+          
+        setNetworkError(errorMessage);
       }
     } catch (error) {
       console.error("Connection test error:", error);
@@ -50,14 +57,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setNetworkError(null)
-
+    
     if (connectionStatus !== 'connected') {
       setNetworkError("Cannot proceed without a connection to our servers. Please check your internet connection and try again.");
-      setLoading(false);
       return;
     }
+    
+    setLoading(true)
+    setNetworkError(null)
 
     try {
       if (isSignUp) {
@@ -71,16 +78,18 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     } catch (error) {
       console.error('Auth error:', error)
       
-      // Network error checking
+      // Check for network errors
       if (error instanceof Error) {
         const errorMessage = error.message || "Unknown error";
         if (
           errorMessage.includes("fetch") || 
           errorMessage.includes("network") ||
           errorMessage.includes("Failed to fetch") ||
-          errorMessage.includes("NetworkError")
+          errorMessage.includes("NetworkError") ||
+          errorMessage.includes("connection")
         ) {
           setNetworkError("Network connection issue. Please check your internet connection and try again.");
+          setConnectionStatus('disconnected');
         }
       }
     } finally {
@@ -104,7 +113,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' 
             : connectionStatus === 'testing' 
               ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
-              : 'bg-destructive/10 text-destructive'
+              : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300'
         }`}>
           {connectionStatus === 'connected' ? (
             <>

@@ -25,7 +25,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const fetchSession = async () => {
       try {
         console.log("Fetching initial session...");
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error("Session fetch error:", error);
+          throw error;
+        }
+        
         setUser(session?.user ?? null)
         console.log("Session checked, user:", session?.user?.email || "No user")
       } catch (error) {
@@ -76,12 +82,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Attempting signup with:", email)
       
+      // Add additional logging to track the request
+      console.log("Sending signup request to Supabase...");
+      
       // Proceed with signup
       const { error, data } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}`
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       })
       
@@ -141,13 +150,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithProvider = async (provider: Provider) => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ 
+      console.log(`Attempting to sign in with provider: ${provider}`);
+      const { error, data } = await supabase.auth.signInWithOAuth({ 
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`
         }
       })
+      
       if (error) {
+        console.error("Provider sign in error:", error);
         toast({
           title: "Provider sign in failed",
           description: error.message,
@@ -155,6 +167,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
         throw error
       }
+      
+      console.log("OAuth sign in initiated:", data);
     } catch (error) {
       console.error("Provider sign in error:", error)
       throw error

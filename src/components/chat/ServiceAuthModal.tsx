@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: Servic
         title: "Authentication Started",
         description: `Please complete the authentication process for ${service.name} in the popup window.`
       });
+      onClose(); // Close the modal after successful connection initiation
     } catch (error) {
       toast({
         title: "Connection Failed",

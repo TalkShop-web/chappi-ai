@@ -7,10 +7,12 @@ import { useToast } from '@/components/ui/use-toast'
 import { useState } from 'react'
 
 export function useServices() {
+  // Move all useState calls to the top
+  const [authWindow, setAuthWindow] = useState<Window | null>(null)
+  
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const [authWindow, setAuthWindow] = useState<Window | null>(null)
 
   const {
     data: services,
@@ -32,50 +34,23 @@ export function useServices() {
     enabled: !!user?.id,
   })
 
-  const updateService = useMutation({
-    mutationFn: async ({ 
-      serviceName, 
-      isConnected,
-    }: { 
-      serviceName: ServiceConnection['service_name']
-      isConnected: boolean
-    }) => {
-      if (!user?.id) throw new Error('No user logged in')
-
-      // If we're connecting, initiate the OAuth flow
-      if (isConnected) {
-        await initiateAuthFlow(serviceName);
-      }
-
-      const { data, error } = await supabase
-        .from('service_connections')
-        .upsert({
-          user_id: user.id,
-          service_name: serviceName,
-          is_connected: isConnected,
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services', user?.id] })
-      toast({
-        title: 'Service updated',
-        description: 'Your service connection has been updated successfully.',
-      })
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update service connection',
-        variant: 'destructive',
-      })
-    },
-  })
+  // Helper function to get the appropriate auth URL for each service
+  const getAuthUrl = (serviceName: ServiceConnection['service_name']): string => {
+    // In a real application, these would be actual OAuth authorization URLs
+    // with your app's client ID and redirect URI
+    switch (serviceName) {
+      case 'ChatGPT':
+        return 'https://auth.openai.com/oauth?client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_REDIRECT_URI';
+      case 'Claude':
+        return 'https://console.anthropic.com/account/keys';
+      case 'Gemini':
+        return 'https://makersuite.google.com/app/apikey';
+      case 'Perplexity':
+        return 'https://www.perplexity.ai/settings/api';
+      default:
+        return '#';
+    }
+  };
 
   // This function initiates the OAuth authentication flow for different services
   const initiateAuthFlow = async (
@@ -121,23 +96,50 @@ export function useServices() {
     });
   };
 
-  // Helper function to get the appropriate auth URL for each service
-  const getAuthUrl = (serviceName: ServiceConnection['service_name']): string => {
-    // In a real application, these would be actual OAuth authorization URLs
-    // with your app's client ID and redirect URI
-    switch (serviceName) {
-      case 'ChatGPT':
-        return 'https://auth.openai.com/oauth?client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_REDIRECT_URI';
-      case 'Claude':
-        return 'https://console.anthropic.com/account/keys';
-      case 'Gemini':
-        return 'https://makersuite.google.com/app/apikey';
-      case 'Perplexity':
-        return 'https://www.perplexity.ai/settings/api';
-      default:
-        return '#';
-    }
-  };
+  const updateService = useMutation({
+    mutationFn: async ({ 
+      serviceName, 
+      isConnected,
+    }: { 
+      serviceName: ServiceConnection['service_name']
+      isConnected: boolean
+    }) => {
+      if (!user?.id) throw new Error('No user logged in')
+
+      // If we're connecting, initiate the OAuth flow
+      if (isConnected) {
+        await initiateAuthFlow(serviceName);
+      }
+
+      const { data, error } = await supabase
+        .from('service_connections')
+        .upsert({
+          user_id: user.id,
+          service_name: serviceName,
+          is_connected: isConnected,
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services', user?.id] })
+      toast({
+        title: 'Service updated',
+        description: 'Your service connection has been updated successfully.',
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update service connection',
+        variant: 'destructive',
+      })
+    },
+  })
 
   return {
     services,

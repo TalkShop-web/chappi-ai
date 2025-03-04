@@ -4,11 +4,13 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { ServiceConnection } from '@/types/database'
 import { useToast } from '@/components/ui/use-toast'
+import { useState } from 'react'
 
 export function useServices() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const [authWindow, setAuthWindow] = useState<Window | null>(null)
 
   const {
     data: services,
@@ -34,24 +36,15 @@ export function useServices() {
     mutationFn: async ({ 
       serviceName, 
       isConnected,
-      apiKey 
     }: { 
       serviceName: ServiceConnection['service_name']
       isConnected: boolean
-      apiKey?: string
     }) => {
       if (!user?.id) throw new Error('No user logged in')
 
-      // If we're connecting and have an API key, first validate it
-      if (isConnected && apiKey) {
-        const isValid = await validateApiKey(serviceName, apiKey);
-        if (!isValid) {
-          throw new Error(`Invalid API key for ${serviceName}`);
-        }
-        
-        // Here we would store the API key securely, but for this demo
-        // we'll just simulate successful connection
-        console.log(`API key for ${serviceName} is valid`);
+      // If we're connecting, initiate the OAuth flow
+      if (isConnected) {
+        await initiateAuthFlow(serviceName);
       }
 
       const { data, error } = await supabase
@@ -84,30 +77,73 @@ export function useServices() {
     },
   })
 
-  // This function would validate the API key with the respective service
-  // For demo purposes, we'll just simulate validation
-  const validateApiKey = async (
-    serviceName: ServiceConnection['service_name'], 
-    apiKey: string
-  ): Promise<boolean> => {
-    // In a real app, you would make an API call to validate the key
-    // This is just a placeholder that accepts any non-empty key
-    if (!apiKey.trim()) return false;
+  // This function initiates the OAuth authentication flow for different services
+  const initiateAuthFlow = async (
+    serviceName: ServiceConnection['service_name']
+  ): Promise<void> => {
+    // Determine the auth URL based on the service
+    const authUrl = getAuthUrl(serviceName);
     
-    // Here you would implement actual API validation:
-    // e.g., for OpenAI:
-    // const response = await fetch('https://api.openai.com/v1/models', {
-    //   headers: { 'Authorization': `Bearer ${apiKey}` }
-    // });
-    // return response.ok;
+    // Open the authentication window
+    const width = 600;
+    const height = 700;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
     
-    return true;
-  }
+    const authWindowInstance = window.open(
+      authUrl,
+      `Connect to ${serviceName}`,
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+    
+    if (!authWindowInstance) {
+      throw new Error('Could not open authentication window. Please allow popups for this site.');
+    }
+    
+    setAuthWindow(authWindowInstance);
+    
+    // In a real implementation, we would:
+    // 1. Listen for a message from the auth window (via postMessage)
+    // 2. Verify the auth was successful
+    // 3. Store tokens securely (not on the client)
+    
+    // For this demo, we'll simulate a successful authentication
+    // In a real app, this would be handled by the OAuth redirect and callback
+    return new Promise((resolve) => {
+      // Simulate auth completion after a delay
+      setTimeout(() => {
+        if (authWindowInstance && !authWindowInstance.closed) {
+          authWindowInstance.close();
+        }
+        setAuthWindow(null);
+        resolve();
+      }, 3000);
+    });
+  };
+
+  // Helper function to get the appropriate auth URL for each service
+  const getAuthUrl = (serviceName: ServiceConnection['service_name']): string => {
+    // In a real application, these would be actual OAuth authorization URLs
+    // with your app's client ID and redirect URI
+    switch (serviceName) {
+      case 'ChatGPT':
+        return 'https://auth.openai.com/oauth?client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_REDIRECT_URI';
+      case 'Claude':
+        return 'https://console.anthropic.com/account/keys';
+      case 'Gemini':
+        return 'https://makersuite.google.com/app/apikey';
+      case 'Perplexity':
+        return 'https://www.perplexity.ai/settings/api';
+      default:
+        return '#';
+    }
+  };
 
   return {
     services,
     isLoading,
     error,
     updateService,
+    authWindow,
   }
 }

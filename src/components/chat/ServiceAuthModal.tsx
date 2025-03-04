@@ -1,8 +1,6 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { AIService } from './types';
 
@@ -10,38 +8,24 @@ interface ServiceAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   service: AIService | null;
-  onConnect: (serviceName: AIService['name'], apiKey: string) => Promise<void>;
+  onConnect: (serviceName: AIService['name']) => Promise<void>;
 }
 
 export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: ServiceAuthModalProps) {
-  const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   if (!service) return null;
 
-  const handleConnect = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!apiKey.trim()) {
-      toast({
-        title: "API Key Required",
-        description: `Please enter a valid API key for ${service.name}`,
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const handleConnect = async () => {
     setIsLoading(true);
     
     try {
-      await onConnect(service.name, apiKey);
+      await onConnect(service.name);
       toast({
-        title: "Connection Successful",
-        description: `Successfully connected to ${service.name}`
+        title: "Authentication Started",
+        description: `Please complete the authentication process for ${service.name} in the popup window.`
       });
-      setApiKey('');
-      onClose();
     } catch (error) {
       toast({
         title: "Connection Failed",
@@ -53,23 +37,13 @@ export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: Servic
     }
   };
 
-  const getApiKeyPlaceholder = () => {
+  const getServiceDescription = () => {
     switch(service.name) {
-      case "ChatGPT": return "sk-...";
-      case "Claude": return "sk-ant-...";
-      case "Gemini": return "AIza...";
-      case "Perplexity": return "pplx-...";
-      default: return "Enter API Key";
-    }
-  };
-
-  const getApiKeyDescription = () => {
-    switch(service.name) {
-      case "ChatGPT": return "Enter your OpenAI API key";
-      case "Claude": return "Enter your Anthropic API key";
-      case "Gemini": return "Enter your Google AI API key";
-      case "Perplexity": return "Enter your Perplexity API key";
-      default: return "Enter your API key";
+      case "ChatGPT": return "Authenticate with your OpenAI account";
+      case "Claude": return "Authenticate with your Anthropic account";
+      case "Gemini": return "Authenticate with your Google account";
+      case "Perplexity": return "Authenticate with your Perplexity account";
+      default: return "Authenticate with your account";
     }
   };
 
@@ -82,18 +56,15 @@ export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: Servic
             Connect to {service.name}
           </DialogTitle>
           <DialogDescription>
-            {getApiKeyDescription()}
+            {getServiceDescription()}
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleConnect} className="space-y-4">
-          <Input
-            type="password"
-            placeholder={getApiKeyPlaceholder()}
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            autoComplete="off"
-          />
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            You'll be redirected to {service.name} to authorize access to your account.
+            No API keys are required.
+          </p>
           
           <div className="flex justify-end gap-2">
             <Button 
@@ -105,13 +76,13 @@ export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: Servic
               Cancel
             </Button>
             <Button 
-              type="submit" 
+              onClick={handleConnect} 
               disabled={isLoading}
             >
-              {isLoading ? "Connecting..." : "Connect"}
+              {isLoading ? "Connecting..." : `Connect to ${service.name}`}
             </Button>
           </div>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

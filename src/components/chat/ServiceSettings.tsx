@@ -73,15 +73,23 @@ export function ServiceSettings({
     }
   };
 
-  const handleApiConnect = async (serviceName: AIService['name'], apiKey: string) => {
-    await updateService.mutateAsync({
-      serviceName,
-      isConnected: true,
-      apiKey,
-    });
-    
-    // Update the UI state in the parent component
-    onConnectService(serviceName, true);
+  const handleAuthConnect = async (serviceName: AIService['name']) => {
+    try {
+      await updateService.mutateAsync({
+        serviceName,
+        isConnected: true,
+      });
+      
+      // Update the UI state in the parent component
+      onConnectService(serviceName, true);
+      
+      // Close the modal
+      setAuthModalOpen(false);
+      setSelectedService(null);
+    } catch (error) {
+      console.error("Failed to connect service:", error);
+      throw error; // Let the modal component handle the error
+    }
   };
 
   return (
@@ -151,7 +159,7 @@ export function ServiceSettings({
           setSelectedService(null);
         }}
         service={selectedService}
-        onConnect={handleApiConnect}
+        onConnect={handleAuthConnect}
       />
     </div>
   );

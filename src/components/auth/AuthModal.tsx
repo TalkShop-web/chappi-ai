@@ -62,6 +62,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         description: "Cannot proceed without a connection to our servers. Please check your internet connection and try again.",
         variant: "destructive"
       });
+      handleRetry(); // Automatically retry the connection
       return;
     }
     
@@ -70,11 +71,19 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     try {
       if (isSignUp) {
         console.log(`Attempting to sign up with email: ${email}`)
-        await signUp(email, password)
+        const user = await signUp(email, password)
+        if (user) {
+          toast({
+            title: "Account created",
+            description: "Please check your email to verify your account.",
+          });
+        }
         // Don't close modal on signup as verification may be required
       } else {
-        await signIn(email, password)
-        onClose()
+        const user = await signIn(email, password)
+        if (user) {
+          onClose()
+        }
       }
     } catch (error) {
       console.error('Auth error:', error)

@@ -1,9 +1,9 @@
 
 import { supabase } from '@/lib/supabase'
-import { withTimeout, retryWithBackoff } from '@/utils/connectionUtils'
+import { withTimeout, retryWithBackoff, isNetworkError } from '@/utils/connectionUtils'
 import { checkConnectionBeforeAuth } from './utils/connectionChecker'
-import { handleAuthError, handleSupabaseError } from './utils/errorHandler'
 import { handleAuthSuccess } from './utils/successHandler'
+import { toast } from '@/hooks/use-toast'
 
 export function useSignUpOperation() {
   const signUp = async (email: string, password: string, setIsConnected: (status: boolean) => void) => {
@@ -11,7 +11,10 @@ export function useSignUpOperation() {
       console.log("Attempting to sign up with:", email)
       
       // Check connection before proceeding
-      await checkConnectionBeforeAuth(setIsConnected)
+      const isConnected = await checkConnectionBeforeAuth(setIsConnected)
+      if (!isConnected) {
+        return; // Exit early if not connected
+      }
       
       // Use retry with backoff for network resilience
       const response = await retryWithBackoff(
@@ -29,11 +32,21 @@ export function useSignUpOperation() {
         1, // 1 retry only
         500, // Start with 500ms delay
         2000, // Max 2 second delay
-        (error) => error && error.message && error.message.includes('network')
+        (error) => isNetworkError(error)
       );
       
       if (response.error) {
-        handleSupabaseError(response.error, 'signUp', setIsConnected)
+        toast({
+          title: "Sign up failed", 
+          description: response.error.message,
+          variant: "destructive"
+        })
+        
+        if (isNetworkError(response.error)) {
+          setIsConnected(false);
+        }
+        
+        return; // Exit early on error
       }
       
       handleAuthSuccess({ 
@@ -41,12 +54,23 @@ export function useSignUpOperation() {
         operationType: 'signUp' 
       })
       
+      return response.data?.user || null;
+      
     } catch (error) {
-      handleAuthError({ 
-        error, 
-        operationType: 'signUp', 
-        setIsConnected 
+      console.error("Sign up error:", error);
+      
+      // Update connection status if it's a network error
+      if (error instanceof Error && isNetworkError(error)) {
+        setIsConnected(false);
+      }
+      
+      toast({
+        title: "Sign up failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive"
       })
+      
+      return null;
     }
   }
 

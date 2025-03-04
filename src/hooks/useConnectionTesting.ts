@@ -1,15 +1,7 @@
 
 import { useCallback } from 'react';
 import { ConnectionStatusType } from './useConnectionState';
-import { withTimeout, pingConnection } from '@/utils/connectionUtils';
-
-// Mock Supabase connection check result for now since we're having timeout issues
-// with the actual check. This allows the UI to work while connection checks are improved.
-interface ConnectionCheckResult {
-  connected: boolean;
-  partial: boolean;
-  message: string | null;
-}
+import { pingConnection } from '@/utils/connectionUtils';
 
 export function useConnectionTesting(
   isMountedRef: React.MutableRefObject<boolean>,
@@ -27,28 +19,36 @@ export function useConnectionTesting(
       return false;
     }
     
-    const isConnected = await pingConnection();
-    
-    if (testingAborted || !isMountedRef.current) {
-      console.log("Connection test was aborted");
-      return false;
-    }
-    
-    if (!isConnected) {
-      console.log("Quick ping test failed - network appears down");
+    try {
+      const isConnected = await pingConnection();
+      
+      if (testingAborted || !isMountedRef.current) {
+        console.log("Connection test was aborted");
+        return false;
+      }
+      
+      if (!isConnected) {
+        console.log("Quick ping test failed - network appears down");
+        setConnectionStatus('disconnected');
+        setConnectionMessage("Unable to reach our servers. Your connection appears to be down or very slow.");
+        return false;
+      }
+      
+      console.log("Quick ping successful");
+      return true;
+    } catch (error) {
+      console.error("Ping test error:", error);
       setConnectionStatus('disconnected');
-      setConnectionMessage("Unable to reach our servers. Your connection appears to be down or very slow.");
+      setConnectionMessage("Connection test failed. Please try again.");
       return false;
     }
-    
-    console.log("Quick ping successful, going to partial mode first");
-    return true;
   }, [isMountedRef, testingAborted, setConnectionStatus, setConnectionMessage]);
   
   const performThoroughTest = useCallback(async (): Promise<void> => {
     try {
       if (testingAborted || !isMountedRef.current) return;
       
+      // If we've made it this far, the basic connection test succeeded
       console.log("Successfully connected to basic services");
       setConnectionStatus('connected');
       setConnectionMessage(null);
@@ -56,8 +56,9 @@ export function useConnectionTesting(
       if (testingAborted || !isMountedRef.current) return;
       
       console.error("Background connection check failed:", error);
-      setConnectionStatus('partial');
-      setConnectionMessage("Connected to basic services. Some advanced features may be limited.");
+      // Still mark as connected since the basic test passed
+      setConnectionStatus('connected');
+      setConnectionMessage(null);
     }
   }, [isMountedRef, testingAborted, setConnectionStatus, setConnectionMessage]);
   

@@ -142,7 +142,7 @@ export const pingConnection = async (): Promise<boolean> => {
         resolve(true);
       };
       
-      // Use a cache-busting query and a reliable image
+      // Use a cache-busting query and a reliable image from a CDN
       const timestamp = Date.now();
       img.src = `https://www.google.com/favicon.ico?_=${timestamp}`;
     });

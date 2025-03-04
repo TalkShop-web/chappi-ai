@@ -17,7 +17,7 @@ export async function checkConnectionBeforeAuth(
       description: "Your device appears to be offline. Please check your internet connection.",
       variant: "destructive"
     })
-    throw new Error("Device is offline")
+    return false // Return false instead of throwing
   }
   
   // Use the improved ping test
@@ -32,7 +32,7 @@ export async function checkConnectionBeforeAuth(
       description: "Cannot reach our servers. Please check your internet connection and try again.",
       variant: "destructive"
     });
-    throw new Error("Server unreachable");
+    return false; // Return false instead of throwing
   }
   
   console.log("Connection test passed, proceeding with auth")

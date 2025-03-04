@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/auth/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, Wifi, WifiOff, ServerOff } from 'lucide-react'
-import { checkSupabaseConnection, supabase } from '@/lib/supabase'
+import { checkSupabaseConnection, supabase, ConnectionCheckResult } from '@/lib/supabase'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -76,7 +76,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       console.log("Testing connection to Supabase...");
       
       // Set a timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error("Connection test timed out")), 5000);
       });
       
@@ -102,7 +102,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       if (!result.connected) {
         try {
           // Simple ping test to verify general connectivity
-          const response = await fetch(`${window.location.origin}/ping-test`, { 
+          await fetch(`${window.location.origin}/ping-test`, { 
             method: 'HEAD',
             mode: 'no-cors',
             cache: 'no-store'

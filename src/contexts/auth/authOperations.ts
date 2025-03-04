@@ -1,4 +1,3 @@
-
 import { Provider } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
@@ -117,33 +116,32 @@ export function useAuthOperations() {
       console.log("Sending signup request to Supabase...");
       
       // Set a timeout to detect hanging requests
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error("Request timed out")), 10000);
       });
       
       // Race the actual request against the timeout
-      const { error, data } = await Promise.race([
-        supabase.auth.signUp({ 
-          email, 
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-            captchaToken: undefined // Make sure no captcha is expected
-          }
-        }),
-        timeoutPromise
-      ]);
+      const signUpPromise = supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          captchaToken: undefined // Make sure no captcha is expected
+        }
+      });
       
-      if (error) {
-        console.error("Signup error:", error)
+      const result = await Promise.race([signUpPromise, timeoutPromise]);
+      
+      if (result.error) {
+        console.error("Signup error:", result.error)
         
         // Check if this is a network error
         const isNetworkError = 
-          (error.status === 0) || 
-          error.message.includes("fetch") || 
-          error.message.includes("network") ||
-          error.message.includes("Failed to fetch") ||
-          error.message.includes("timeout") ||
+          (result.error.status === 0) || 
+          result.error.message.includes("fetch") || 
+          result.error.message.includes("network") ||
+          result.error.message.includes("Failed to fetch") ||
+          result.error.message.includes("timeout") ||
           !navigator.onLine;
         
         if (isNetworkError) {
@@ -158,24 +156,24 @@ export function useAuthOperations() {
           setIsConnected(true)
           toast({
             title: "Sign up failed",
-            description: error.message,
+            description: result.error.message,
             variant: "destructive"
           })
         }
         
-        throw error
+        throw result.error
       }
 
-      console.log("Signup response:", data)
+      console.log("Signup response:", result.data)
       
-      if (data?.user) {
-        console.log("User created:", data.user.email, "Email confirmed:", data.user.email_confirmed_at !== null)
+      if (result.data?.user) {
+        console.log("User created:", result.data.user.email, "Email confirmed:", result.data.user.email_confirmed_at !== null)
       }
       
       // Success message even if email confirmation is required
       toast({
         title: "Account created",
-        description: data.user && data.user.email_confirmed_at !== null 
+        description: result.data.user && result.data.user.email_confirmed_at !== null 
           ? "You can now sign in." 
           : "Please check your email to confirm your account.",
       })

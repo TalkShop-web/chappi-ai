@@ -15,7 +15,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     headers: {
       'X-Client-Info': 'chappi-app'
     },
-    fetch: (...args) => {
+    fetch: (...args: Parameters<typeof fetch>) => {
       // Use a fetch with timeout
       const controller = new AbortController();
       const { signal } = controller;
@@ -36,8 +36,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
+// Define a type for the connection check result
+export interface ConnectionCheckResult {
+  connected: boolean;
+  partial?: boolean;
+  error: Error | null;
+  message: string;
+}
+
 // Improved connection check function with better error reporting and timeout
-export const checkSupabaseConnection = async () => {
+export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> => {
   if (!navigator.onLine) {
     console.error('Browser reports device is offline');
     return {
@@ -103,7 +111,7 @@ export const checkSupabaseConnection = async () => {
     
     return {
       connected: false,
-      error: error,
+      error: error as Error,
       message: isTimeoutError 
         ? 'Connection timed out. Server may be unavailable or your connection is slow.'
         : error instanceof Error 

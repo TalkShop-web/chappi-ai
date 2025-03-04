@@ -1,7 +1,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Provider } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { supabase, checkSupabaseConnection } from '@/lib/supabase'
 import { useToast } from '@/components/ui/use-toast'
 
 type AuthContextType = {
@@ -77,16 +77,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // First verify Supabase connection
       console.log("Testing Supabase connection before signup...")
-      try {
-        const { error: pingError } = await supabase.from('service_connections').select('count').limit(1)
-        if (pingError) {
-          console.warn("Supabase connection test failed:", pingError)
-        } else {
-          console.log("Supabase connection test successful")
-        }
-      } catch (pingError) {
-        console.error("Supabase connection test error:", pingError)
+      const connectionTest = await checkSupabaseConnection()
+      
+      if (!connectionTest.connected) {
+        console.error("Cannot connect to Supabase:", connectionTest.error)
+        toast({
+          title: "Connection Error",
+          description: "Cannot connect to our servers. Please check your internet connection and try again.",
+          variant: "destructive"
+        })
+        throw new Error("Cannot connect to Supabase")
       }
+      
+      console.log("Supabase connection verified, proceeding with signup")
       
       // Proceed with signup
       const { error, data } = await supabase.auth.signUp({ 
@@ -129,7 +132,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const isNetworkError = 
           errorMessage.includes("fetch") || 
           errorMessage.includes("network") ||
-          errorMessage.includes("Failed to fetch");
+          errorMessage.includes("Failed to fetch") ||
+          errorMessage.includes("NetworkError");
           
         toast({
           title: "Sign up failed",

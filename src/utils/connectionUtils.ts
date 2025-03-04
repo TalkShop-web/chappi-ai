@@ -15,16 +15,25 @@ export const isNetworkError = (error: any): boolean => {
   // Check error status (0 typically indicates network issue)
   if (error.status === 0) return true;
   
+  // Check for Supabase connection failures
+  if (error.code === 'PGRST_CONNECTION_ERROR' || 
+      error.code === 'CONNECTION_ERROR' || 
+      error.code === 'SERVICE_UNAVAILABLE') {
+    return true;
+  }
+  
   // Check error message for network-related terms
-  const errorMessage = error.message || "";
+  const errorMessage = typeof error.message === 'string' ? error.message.toLowerCase() : '';
   return (
     errorMessage.includes("fetch") || 
     errorMessage.includes("network") ||
-    errorMessage.includes("Failed to fetch") ||
-    errorMessage.includes("NetworkError") ||
+    errorMessage.includes("failed to fetch") ||
+    errorMessage.includes("networkerror") ||
     errorMessage.includes("connection") ||
     errorMessage.includes("timeout") ||
-    errorMessage.includes("abort")
+    errorMessage.includes("abort") ||
+    errorMessage.includes("unreachable") ||
+    errorMessage.includes("offline")
   );
 };
 
@@ -41,6 +50,6 @@ export const createTimeoutPromise = <T>(ms: number, errorMessage = "Request time
  * Race a promise against a timeout
  */
 export const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
-  const timeoutPromise = createTimeoutPromise<T>(timeoutMs);
+  const timeoutPromise = createTimeoutPromise<T>(timeoutMs, "Authentication request timed out. Please check your connection and try again.");
   return Promise.race([promise, timeoutPromise]);
 };

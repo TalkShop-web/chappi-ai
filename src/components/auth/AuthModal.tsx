@@ -1,5 +1,5 @@
 
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAuth } from '@/contexts/auth/AuthContext'
 import { useToast } from '@/hooks/use-toast'
@@ -27,6 +27,27 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setRetryCount,
     testConnection
   } = useAuthConnection(isOpen)
+
+  // Add effect to check connection status when modal opens or when network status changes
+  useEffect(() => {
+    const handleOnlineStatusChange = () => {
+      if (isOpen) {
+        if (navigator.onLine) {
+          testConnection();
+        } else {
+          setConnectionMessage("Your device appears to be offline. Please check your internet connection.");
+        }
+      }
+    };
+    
+    window.addEventListener('online', handleOnlineStatusChange);
+    window.addEventListener('offline', handleOnlineStatusChange);
+    
+    return () => {
+      window.removeEventListener('online', handleOnlineStatusChange);
+      window.removeEventListener('offline', handleOnlineStatusChange);
+    };
+  }, [isOpen, testConnection, setConnectionMessage]);
 
   const handleToggleMode = () => {
     setIsSignUp(!isSignUp)

@@ -10,7 +10,7 @@ export function useSignInOperation() {
     try {
       console.log("Attempting to sign in with:", email)
       
-      // First check if we're online
+      // First check if we're online before attempting
       if (!navigator.onLine) {
         console.error("Browser reports offline status")
         setIsConnected(false)
@@ -19,10 +19,12 @@ export function useSignInOperation() {
           description: "Your device appears to be offline. Please check your internet connection.",
           variant: "destructive"
         })
-        return // Early return - don't even try to connect if we're offline
+        throw new Error("Device is offline")
       }
       
       setIsConnected(true) // Optimistically set connected
+      
+      console.log("Sending sign in request to Supabase...")
       
       const response = await withTimeout(
         supabase.auth.signInWithPassword({ 
@@ -32,7 +34,7 @@ export function useSignInOperation() {
             captchaToken: undefined
           }
         }),
-        10000
+        15000 // Increased timeout to 15 seconds
       );
       
       if (response.error) {
@@ -42,7 +44,7 @@ export function useSignInOperation() {
           setIsConnected(false)
           toast({
             title: "Connection Error",
-            description: "Unable to reach authentication servers. Please check your internet connection.",
+            description: "Unable to reach authentication servers. Please check your internet connection and try again.",
             variant: "destructive"
           })
         } else {
@@ -68,13 +70,14 @@ export function useSignInOperation() {
     } catch (error) {
       console.error("Sign in error:", error)
       
-      if (error instanceof Error && isNetworkError(error)) {
+      // Check explicitly for network errors
+      if (error instanceof Error && (isNetworkError(error) || !navigator.onLine)) {
+        setIsConnected(false)
         toast({
           title: "Connection Error",
-          description: "Unable to connect to authentication service. Please check your internet connection.",
+          description: "Unable to connect to authentication service. Please check your internet connection and try again.",
           variant: "destructive"
         })
-        setIsConnected(false)
       }
       
       throw error

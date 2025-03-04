@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { checkSupabaseConnection, ConnectionCheckResult } from '@/lib/supabase'
 import { withTimeout } from '@/utils/connectionUtils'
 
@@ -10,44 +10,8 @@ export function useAuthConnection(isOpen: boolean) {
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
 
-  // Check browser online status first, before testing Supabase connection
-  useEffect(() => {
-    const handleOnlineStatusChange = () => {
-      if (!navigator.onLine) {
-        setConnectionStatus('disconnected');
-        setConnectionMessage("Your device appears to be offline. Please check your internet connection.");
-      } else if (connectionStatus === 'disconnected') {
-        // Only retest if we were previously disconnected
-        testConnection();
-      }
-    };
-
-    window.addEventListener('online', handleOnlineStatusChange);
-    window.addEventListener('offline', handleOnlineStatusChange);
-
-    return () => {
-      window.removeEventListener('online', handleOnlineStatusChange);
-      window.removeEventListener('offline', handleOnlineStatusChange);
-    };
-  }, [connectionStatus]);
-
-  useEffect(() => {
-    if (isOpen) {
-      console.log("Auth modal opened, testing connection...");
-      testConnection();
-      
-      const intervalId = setInterval(() => {
-        if (connectionStatus === 'disconnected' || connectionStatus === 'partial') {
-          console.log("Retrying connection test...");
-          testConnection();
-        }
-      }, 5000);
-      
-      return () => clearInterval(intervalId);
-    }
-  }, [isOpen, connectionStatus, retryCount]);
-
-  const testConnection = async () => {
+  // Memoize the testConnection function to prevent recreation in useEffect dependencies
+  const testConnection = useCallback(async () => {
     setConnectionStatus('testing');
     
     // First check browser's online status
@@ -82,7 +46,44 @@ export function useAuthConnection(isOpen: boolean) {
         ? `Connection error: ${error.message}` 
         : "Connection test failed. Please check your internet connection.");
     }
-  };
+  }, []);
+
+  // Check browser online status first, before testing Supabase connection
+  useEffect(() => {
+    const handleOnlineStatusChange = () => {
+      if (!navigator.onLine) {
+        setConnectionStatus('disconnected');
+        setConnectionMessage("Your device appears to be offline. Please check your internet connection.");
+      } else if (connectionStatus === 'disconnected' && isOpen) {
+        // Only retest if we were previously disconnected and modal is open
+        testConnection();
+      }
+    };
+
+    window.addEventListener('online', handleOnlineStatusChange);
+    window.addEventListener('offline', handleOnlineStatusChange);
+
+    return () => {
+      window.removeEventListener('online', handleOnlineStatusChange);
+      window.removeEventListener('offline', handleOnlineStatusChange);
+    };
+  }, [connectionStatus, isOpen, testConnection]);
+
+  useEffect(() => {
+    if (isOpen) {
+      console.log("Auth modal opened, testing connection...");
+      testConnection();
+      
+      const intervalId = setInterval(() => {
+        if ((connectionStatus === 'disconnected' || connectionStatus === 'partial') && isOpen) {
+          console.log("Retrying connection test...");
+          testConnection();
+        }
+      }, 5000);
+      
+      return () => clearInterval(intervalId);
+    }
+  }, [isOpen, connectionStatus, retryCount, testConnection]);
 
   const handleRetry = () => {
     console.log("Manual retry requested");
@@ -93,7 +94,7 @@ export function useAuthConnection(isOpen: boolean) {
   return {
     connectionStatus,
     connectionMessage,
-    setConnectionMessage, // Added this line to expose the setter
+    setConnectionMessage,
     testConnection,
     handleRetry,
     retryCount,

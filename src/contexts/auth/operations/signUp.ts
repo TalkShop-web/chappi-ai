@@ -19,13 +19,12 @@ export function useSignUpOperation() {
           description: "Your device appears to be offline. Please check your internet connection.",
           variant: "destructive"
         })
-        return // Early return
+        throw new Error("Device is offline")
       }
       
       setIsConnected(true) // Optimistically set connected
       
-      // Add additional logging to track the request
-      console.log("Sending signup request to Supabase...");
+      console.log("Sending signup request to Supabase...")
       
       const response = await withTimeout(
         supabase.auth.signUp({ 
@@ -36,7 +35,7 @@ export function useSignUpOperation() {
             captchaToken: undefined
           }
         }),
-        10000
+        15000 // Increased timeout to 15 seconds
       );
       
       if (response.error) {
@@ -46,7 +45,7 @@ export function useSignUpOperation() {
           setIsConnected(false)
           toast({
             title: "Connection Error",
-            description: "Unable to reach authentication servers. Please check your internet connection.",
+            description: "Unable to reach authentication servers. Please check your internet connection and try again.",
             variant: "destructive"
           })
         } else {
@@ -78,11 +77,12 @@ export function useSignUpOperation() {
     } catch (error) {
       console.error("Signup process error:", error)
       
-      if (error instanceof Error && isNetworkError(error)) {
+      // Better network error detection
+      if (error instanceof Error && (isNetworkError(error) || !navigator.onLine)) {
         setIsConnected(false)
         toast({
           title: "Connection Error",
-          description: "Unable to connect to authentication service. Please check your internet connection.",
+          description: "Unable to connect to authentication service. Please check your internet connection and try again.",
           variant: "destructive"
         })
       } else {

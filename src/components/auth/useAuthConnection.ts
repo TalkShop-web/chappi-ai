@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { checkSupabaseConnection, ConnectionCheckResult } from '@/lib/supabase'
 import { withTimeout, retryWithBackoff, pingConnection } from '@/utils/connectionUtils'
@@ -11,10 +12,15 @@ export function useAuthConnection(isOpen: boolean) {
   const [testingAborted, setTestingAborted] = useState(false)
   
   const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
+  // Clear any pending operations on unmount
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, []);
 
@@ -33,6 +39,12 @@ export function useAuthConnection(isOpen: boolean) {
   const testConnection = useCallback(async () => {
     if (!isOpen) return; // Don't test if modal is closed
     
+    // Abort any ongoing tests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    
     safeSetConnectionStatus('testing');
     setTestingAborted(false);
     
@@ -44,6 +56,8 @@ export function useAuthConnection(isOpen: boolean) {
     }
     
     try {
+      // First do a quick ping test to check basic connectivity
+      console.log("Performing quick connectivity test...");
       const isConnected = await pingConnection();
       
       if (testingAborted || !isMountedRef.current) {
@@ -60,19 +74,24 @@ export function useAuthConnection(isOpen: boolean) {
       
       console.log("Quick ping successful, going to partial mode first");
       
+      // Set to partial mode right away for better UX
       safeSetConnectionStatus('partial');
       safeSetConnectionMessage("Connected to server, but full authentication status is pending.");
       
+      // Then do the more thorough Supabase check
       setTimeout(async () => {
         try {
           if (testingAborted || !isMountedRef.current) return;
           
+          console.log("Performing full Supabase connection check...");
           const result = await withTimeout<ConnectionCheckResult>(
             checkSupabaseConnection(), 
-            5000
+            10000 // Increased timeout for more thorough check
           );
           
           if (testingAborted || !isMountedRef.current) return;
+          
+          console.log("Supabase connection check result:", result);
           
           if (result.connected) {
             safeSetConnectionStatus('connected');
@@ -87,7 +106,9 @@ export function useAuthConnection(isOpen: boolean) {
         } catch (error) {
           if (testingAborted || !isMountedRef.current) return;
           
-          console.log("Background Supabase check failed, staying in partial mode", error);
+          console.error("Background Supabase check failed:", error);
+          safeSetConnectionStatus('partial');
+          safeSetConnectionMessage("Limited connection detected. Some features may work.");
         }
       }, 100);
       
@@ -143,15 +164,24 @@ export function useAuthConnection(isOpen: boolean) {
       return () => {
         clearInterval(intervalId);
         setTestingAborted(true);
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
       };
     } else {
       setTestingAborted(true);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     }
   }, [isOpen, connectionStatus, testConnection, testingAborted]);
 
   const handleRetry = useCallback(() => {
     if (connectionStatus === 'testing') {
       setTestingAborted(true);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       safeSetConnectionStatus('disconnected');
       safeSetConnectionMessage("Connection test canceled.");
     } else {
@@ -169,5 +199,5 @@ export function useAuthConnection(isOpen: boolean) {
     handleRetry,
     retryCount,
     setRetryCount
-  }
+  };
 }

@@ -35,7 +35,7 @@ export function ConnectionStatus({ status, message, onRetry }: ConnectionStatusP
     onRetry();
     
     // Auto-reset after a delay (for UI feedback)
-    setTimeout(() => setIsRetrying(false), 500);
+    setTimeout(() => setIsRetrying(false), 2000);
   };
     
   switch (safeStatus) {

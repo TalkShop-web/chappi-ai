@@ -83,41 +83,46 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
   try {
     console.log('Testing Supabase connection...')
     
-    // First, try a quick auth check which should be faster than DB
+    // First, try a simple ping test which should be fast
     try {
-      // Fixed: getSession() doesn't accept any arguments
-      const authCheckPromise = supabase.auth.getSession();
+      // Use a simple ping to quickly test connectivity
+      const pingPromise = supabase.auth.getSession();
       
       // Using a separate timeout promise for race condition
-      const timeoutPromise = new Promise<{error: Error}>((_, reject) => {
-        setTimeout(() => reject({error: new Error('Connection timed out')}), 5000);
+      const timeoutPromise = new Promise<{data: null, error: Error}>((_, reject) => {
+        setTimeout(() => reject({
+          data: null, 
+          error: new Error('Connection timed out')
+        }), 5000);
       });
       
       // Using Promise.race to implement timeout
-      const result = await Promise.race([authCheckPromise, timeoutPromise]);
+      const { data, error } = await Promise.race([pingPromise, timeoutPromise]);
       
-      if (result.error) {
-        console.error('Auth connection error:', result.error.message);
+      if (error) {
+        console.error('Auth connection error:', error.message);
         return {
           connected: false,
-          error: result.error,
-          message: `Unable to connect to authentication service: ${result.error.message}`
+          error: error,
+          message: `Unable to connect to authentication service: ${error.message}`
         };
       }
       
-      // If we can connect to auth, we're at least partially connected
+      // If session check worked, we're at least partially connected
       return {
         connected: true,
-        partial: false, // Consider it fully connected if auth works
+        partial: false,
         error: null,
         message: 'Connected to authentication service'
       };
     } catch (err: any) {
-      // Special handling for timeout errors
+      console.error('Auth check error:', err);
+      
+      // Handle different error scenarios
       if (err && err.error && err.error.message === 'Connection timed out') {
         return {
           connected: false,
-          partial: true, // Consider it partially connected even if auth times out
+          partial: true,
           error: err.error,
           message: 'Connection is slow. Basic functionality may work, but some features might be limited.'
         };
@@ -128,7 +133,7 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
         if (err.name === 'AbortError' || (err.message && err.message.includes('timed out'))) {
           return {
             connected: false,
-            partial: true, // Consider it partially connected even if auth times out
+            partial: true,
             error: err,
             message: 'Connection is slow. Basic functionality may work, but some features might be limited.'
           };
@@ -143,7 +148,7 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
         }
       }
       
-      // Default case - could have some connection
+      // Fallback for other error types
       return {
         connected: false,
         partial: true,

@@ -30,7 +30,7 @@ export const isNetworkError = (error: any): boolean => {
     return true;
   }
   
-  // Check error message for network-related terms (more comprehensive)
+  // Check error message for network-related terms
   const errorMessage = typeof error.message === 'string' ? error.message.toLowerCase() : '';
   return (
     errorMessage.includes("fetch") || 
@@ -41,11 +41,7 @@ export const isNetworkError = (error: any): boolean => {
     errorMessage.includes("timeout") ||
     errorMessage.includes("abort") ||
     errorMessage.includes("unreachable") ||
-    errorMessage.includes("offline") ||
-    errorMessage.includes("server") ||
-    errorMessage.includes("unavailable") ||
-    errorMessage.includes("econnrefused") ||
-    errorMessage.includes("econnreset")
+    errorMessage.includes("offline")
   );
 };
 
@@ -59,9 +55,9 @@ export const createTimeoutPromise = <T>(ms: number, errorMessage = "Request time
 };
 
 /**
- * Race a promise against a timeout - with more reasonable default timeout
+ * Race a promise against a timeout - with shorter default timeout
  */
-export const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number = 15000): Promise<T> => {
+export const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> => {
   const timeoutPromise = createTimeoutPromise<T>(timeoutMs, "Request timed out. Please check your connection and try again.");
   return Promise.race([promise, timeoutPromise]);
 };
@@ -72,9 +68,9 @@ export const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number = 15
  */
 export const retryWithBackoff = async <T>(
   fn: () => Promise<T>,
-  retries = 2,
-  initialDelay = 500,
-  maxDelay = 3000,
+  retries = 1,
+  initialDelay = 300,
+  maxDelay = 2000,
   shouldRetry = isNetworkError
 ): Promise<T> => {
   let lastError: any;
@@ -98,7 +94,7 @@ export const retryWithBackoff = async <T>(
       }
       
       // Add jitter to prevent thundering herd
-      const jitter = Math.random() * 100 - 50; // +/- 50ms
+      const jitter = Math.random() * 50; 
       
       // Wait with exponential backoff plus jitter
       const actualDelay = Math.min(delay + jitter, maxDelay);
@@ -114,8 +110,8 @@ export const retryWithBackoff = async <T>(
 };
 
 /**
- * Modified ping function using more reliable image fetch instead of HEAD requests
- * which are more likely to be blocked by CORS or aborted
+ * Simple ping function to check basic internet connectivity
+ * Uses a reliable image fetch approach
  */
 export const pingConnection = async (): Promise<boolean> => {
   if (!navigator.onLine) return false;
@@ -142,8 +138,7 @@ export const pingConnection = async (): Promise<boolean> => {
         // Even an error means the network is working!
         clearTimeout(imgTimeoutId);
         console.log("Image ping failed but network is reachable");
-        // Important: We still consider this a successful ping, 
-        // as we got a response from the server
+        // Important: We still consider this a successful ping
         resolve(true);
       };
       

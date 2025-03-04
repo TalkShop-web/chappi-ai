@@ -1,14 +1,11 @@
 
 import { supabase } from '@/lib/supabase'
-import { useToast } from '@/hooks/use-toast'
 import { withTimeout, retryWithBackoff, isNetworkError } from '@/utils/connectionUtils'
 import { checkConnectionBeforeAuth } from './utils/connectionChecker'
 import { handleAuthError, handleSupabaseError } from './utils/errorHandler'
 import { handleAuthSuccess } from './utils/successHandler'
 
 export function useSignInOperation() {
-  const { toast } = useToast()
-
   const signIn = async (email: string, password: string, setIsConnected: (status: boolean) => void) => {
     try {
       console.log("Attempting to sign in with:", email)

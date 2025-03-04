@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://38a9e9b6-f1cf-4510-aad9-31f7ae0d3fab.supabase.co'
@@ -88,9 +87,7 @@ export const checkSupabaseConnection = async (): Promise<ConnectionCheckResult> 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      const authCheck = await supabase.auth.getSession({
-        signal: controller.signal
-      });
+      const authCheck = await supabase.auth.getSession();
       
       clearTimeout(timeoutId);
       

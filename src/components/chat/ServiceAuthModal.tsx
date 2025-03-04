@@ -14,58 +14,24 @@ interface ServiceAuthModalProps {
 
 export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: ServiceAuthModalProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [authWindow, setAuthWindow] = useState<Window | null>(null);
   const { toast } = useToast();
 
+  // Reset loading state when modal opens or closes
   useEffect(() => {
-    // Check if the auth window is still open
-    const checkWindow = setInterval(() => {
-      if (authWindow && authWindow.closed) {
-        clearInterval(checkWindow);
-        setAuthWindow(null);
-        setIsLoading(false);
-      }
-    }, 500);
-
-    return () => {
-      clearInterval(checkWindow);
-    };
-  }, [authWindow]);
+    if (!isOpen) {
+      setIsLoading(false);
+    }
+  }, [isOpen]);
 
   if (!service) return null;
 
   const handleConnect = async () => {
     setIsLoading(true);
     
-    // Get the appropriate auth URL based on the service
-    const authUrl = getAuthUrl(service.name);
-    
-    // Open the authentication window
-    const width = 600;
-    const height = 700;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-    
-    const authWindowInstance = window.open(
-      authUrl,
-      `Connect to ${service.name}`,
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-    
-    if (!authWindowInstance) {
-      setIsLoading(false);
-      toast({
-        title: "Connection Failed",
-        description: "Could not open authentication window. Please allow popups for this site.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setAuthWindow(authWindowInstance);
-    
     try {
       await onConnect(service.name);
+      
+      // Success is handled by the parent component which will close the modal
       toast({
         title: "Authentication Started",
         description: `Please complete the authentication process for ${service.name} in the popup window.`
@@ -76,42 +42,15 @@ export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: Servic
         description: error instanceof Error ? error.message : `Could not connect to ${service.name}`,
         variant: "destructive"
       });
-      if (authWindowInstance && !authWindowInstance.closed) {
-        authWindowInstance.close();
-      }
-      setAuthWindow(null);
+      
       setIsLoading(false);
     }
   };
 
-  const getAuthUrl = (serviceName: AIService['name']): string => {
-    // These should be actual OAuth authorization URLs in a real app
-    switch(serviceName) {
-      case "ChatGPT":
-        return 'https://auth.openai.com/oauth?client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_REDIRECT_URI';
-      case "Claude":
-        return 'https://console.anthropic.com/account/keys';
-      case "Gemini":
-        return 'https://makersuite.google.com/app/apikey';
-      case "Perplexity":
-        return 'https://www.perplexity.ai/settings/api';
-      default:
-        return '#';
-    }
-  };
-
-  const getServiceDescription = () => {
-    switch(service.name) {
-      case "ChatGPT": return "Authenticate with your OpenAI account";
-      case "Claude": return "Authenticate with your Anthropic account";
-      case "Gemini": return "Authenticate with your Google account";
-      case "Perplexity": return "Authenticate with your Perplexity account";
-      default: return "Authenticate with your account";
-    }
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) onClose();
+    }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -119,7 +58,10 @@ export function ServiceAuthModal({ isOpen, onClose, service, onConnect }: Servic
             Connect to {service.name}
           </DialogTitle>
           <DialogDescription>
-            {getServiceDescription()}
+            {service.name === "ChatGPT" && "Authenticate with your OpenAI account"}
+            {service.name === "Claude" && "Authenticate with your Anthropic account"}
+            {service.name === "Gemini" && "Authenticate with your Google account"}
+            {service.name === "Perplexity" && "Authenticate with your Perplexity account"}
           </DialogDescription>
         </DialogHeader>
         

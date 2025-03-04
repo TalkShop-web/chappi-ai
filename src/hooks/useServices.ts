@@ -58,20 +58,58 @@ export function useServices() {
   ): Promise<void> => {
     console.log(`Initiating auth flow for ${serviceName}`);
     
-    // In a real implementation, we would:
-    // 1. Listen for a message from the auth window (via postMessage)
-    // 2. Verify the auth was successful
-    // 3. Store tokens securely (not on the client)
+    // Get the appropriate auth URL
+    const authUrl = getAuthUrl(serviceName);
     
-    // For this demo, we'll simulate a successful authentication
-    // In a real app, this would be handled by the OAuth redirect and callback
-    return new Promise((resolve) => {
-      // Simulate auth completion after a delay
-      setTimeout(() => {
-        console.log(`Auth flow for ${serviceName} completed`);
-        resolve();
-      }, 3000);
-    });
+    // Open the authentication window
+    const width = 600;
+    const height = 700;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    try {
+      const newAuthWindow = window.open(
+        authUrl,
+        `Connect to ${serviceName}`,
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+      
+      if (!newAuthWindow) {
+        throw new Error("Could not open authentication window. Please allow popups for this site.");
+      }
+      
+      setAuthWindow(newAuthWindow);
+      
+      // In a real implementation, we would:
+      // 1. Listen for a message from the auth window (via postMessage)
+      // 2. Verify the auth was successful
+      // 3. Store tokens securely (not on the client)
+      
+      // For this demo, we'll simulate a successful authentication
+      return new Promise((resolve) => {
+        // Check if the window is closed every 500ms
+        const checkWindowClosed = setInterval(() => {
+          if (newAuthWindow.closed) {
+            clearInterval(checkWindowClosed);
+            setAuthWindow(null);
+            console.log(`Auth window for ${serviceName} closed`);
+            resolve();
+          }
+        }, 500);
+        
+        // Simulate auth completion after a delay if window remains open
+        setTimeout(() => {
+          if (!newAuthWindow.closed) {
+            console.log(`Auth flow for ${serviceName} completed`);
+            clearInterval(checkWindowClosed);
+            resolve();
+          }
+        }, 5000);
+      });
+    } catch (error) {
+      console.error("Failed to open auth window:", error);
+      throw error;
+    }
   };
 
   const updateService = useMutation({
@@ -125,5 +163,7 @@ export function useServices() {
     error,
     updateService,
     authWindow,
+    setAuthWindow,
+    initiateAuthFlow
   }
 }

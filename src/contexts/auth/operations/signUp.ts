@@ -1,7 +1,7 @@
 
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
-import { isNetworkError, withTimeout, retryWithBackoff } from '@/utils/connectionUtils'
+import { isNetworkError, withTimeout, retryWithBackoff, pingConnection } from '@/utils/connectionUtils'
 
 export function useSignUpOperation() {
   const { toast } = useToast()
@@ -22,6 +22,19 @@ export function useSignUpOperation() {
         throw new Error("Device is offline")
       }
       
+      // Check connection with quick ping before proceeding
+      const isConnected = await pingConnection();
+      if (!isConnected) {
+        console.error("Ping test failed, connection appears to be down");
+        setIsConnected(false);
+        toast({
+          title: "Connection Error",
+          description: "Cannot reach our servers. Please check your internet connection and try again.",
+          variant: "destructive"
+        });
+        throw new Error("Server unreachable");
+      }
+      
       setIsConnected(true) // Optimistically set connected
       
       console.log("Sending signup request to Supabase...")
@@ -37,9 +50,12 @@ export function useSignUpOperation() {
               captchaToken: undefined
             }
           }),
-          20000 // Increased timeout to 20 seconds
+          30000 // 30 seconds timeout for sign up
         ),
-        2 // Max 2 retries
+        2, // 2 retries max
+        1000, // Start with 1 second delay
+        8000, // Max 8 second delay
+        isNetworkError
       );
       
       if (response.error) {

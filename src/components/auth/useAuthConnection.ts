@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { checkSupabaseConnection, ConnectionCheckResult } from '@/lib/supabase'
-import { withTimeout, retryWithBackoff } from '@/utils/connectionUtils'
+import { withTimeout, retryWithBackoff, pingConnection } from '@/utils/connectionUtils'
 
 type ConnectionStatusType = 'testing' | 'connected' | 'disconnected' | 'partial'
 
@@ -23,12 +23,24 @@ export function useAuthConnection(isOpen: boolean) {
     }
     
     try {
-      console.log("Testing connection to Supabase...");
+      // First try a quick ping - this is faster than the full Supabase check
+      const isConnected = await pingConnection();
+      if (!isConnected) {
+        console.log("Quick ping test failed - network appears down");
+        setConnectionStatus('disconnected');
+        setConnectionMessage("Unable to reach our servers. Your connection appears to be down or very slow.");
+        return;
+      }
+      
+      console.log("Quick ping successful, testing connection to Supabase...");
       
       // Use retry with backoff for more robust connection testing
       const result = await retryWithBackoff(
-        async () => withTimeout<ConnectionCheckResult>(checkSupabaseConnection(), 5000),
-        1 // Just 1 retry for connection test (to avoid too much delay)
+        async () => withTimeout<ConnectionCheckResult>(checkSupabaseConnection(), 10000),
+        1, // Just 1 retry for connection test
+        500, // Start with 500ms delay
+        2000, // Max 2 second delay
+        (error) => true // Always retry on connection check errors
       );
       
       console.log("Connection test result:", result);
@@ -92,11 +104,11 @@ export function useAuthConnection(isOpen: boolean) {
           console.log("Retrying connection test...");
           testConnection();
         }
-      }, 10000); // Check every 10 seconds instead of 5
+      }, 15000); // Check every 15 seconds when disconnected
       
       return () => clearInterval(intervalId);
     }
-  }, [isOpen, connectionStatus, retryCount, testConnection]);
+  }, [isOpen, connectionStatus, testConnection]);
 
   const handleRetry = () => {
     console.log("Manual retry requested");

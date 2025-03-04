@@ -76,12 +76,12 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       console.log("Testing connection to Supabase...");
       
       // Set a timeout to prevent hanging
-      const timeoutPromise = new Promise<never>((_, reject) => {
+      const timeoutPromise = new Promise<ConnectionCheckResult>((_, reject) => {
         setTimeout(() => reject(new Error("Connection test timed out")), 5000);
       });
       
       // Race the connection test against the timeout
-      const result = await Promise.race([
+      const result = await Promise.race<ConnectionCheckResult>([
         checkSupabaseConnection(),
         timeoutPromise
       ]);

@@ -1,6 +1,13 @@
+
 import { Provider } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
+
+// Define the response type to fix TS errors
+interface SupabaseResponse {
+  data: any;
+  error: any;
+}
 
 export function useAuthOperations() {
   const { toast } = useToast()
@@ -116,7 +123,7 @@ export function useAuthOperations() {
       console.log("Sending signup request to Supabase...");
       
       // Set a timeout to detect hanging requests
-      const timeoutPromise = new Promise<never>((_, reject) => {
+      const timeoutPromise = new Promise<SupabaseResponse>((_, reject) => {
         setTimeout(() => reject(new Error("Request timed out")), 10000);
       });
       
@@ -130,7 +137,7 @@ export function useAuthOperations() {
         }
       });
       
-      const result = await Promise.race([signUpPromise, timeoutPromise]);
+      const result = await Promise.race<SupabaseResponse>([signUpPromise, timeoutPromise]);
       
       if (result.error) {
         console.error("Signup error:", result.error)

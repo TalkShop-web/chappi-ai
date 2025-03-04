@@ -12,11 +12,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true
   },
   global: {
-    fetch: (...args) => {
+    fetch: (url, options) => {
       // Add custom fetch configuration to help with network issues
-      const [url, options] = args
-      console.log(`Supabase fetch: ${url instanceof URL ? url.toString() : url}`)
-      return fetch(...args)
+      console.log(`Supabase fetch: ${url instanceof URL ? url.toString() : String(url)}`)
+      return fetch(url, options)
     },
     headers: {
       'X-Client-Info': 'chappi-web-app',

@@ -35,11 +35,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       }
     } catch (error) {
       console.error('Auth error:', error)
-      toast({
-        title: isSignUp ? "Sign up failed" : "Sign in failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive"
-      })
+      
+      // Don't display another toast since the AuthContext already shows one
     } finally {
       setLoading(false)
     }

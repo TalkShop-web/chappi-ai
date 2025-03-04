@@ -74,6 +74,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string) => {
     try {
       console.log("Attempting signup with:", email)
+      
+      // First verify Supabase connection
+      console.log("Testing Supabase connection before signup...")
+      try {
+        const { error: pingError } = await supabase.from('service_connections').select('count').limit(1)
+        if (pingError) {
+          console.warn("Supabase connection test failed:", pingError)
+        } else {
+          console.log("Supabase connection test successful")
+        }
+      } catch (pingError) {
+        console.error("Supabase connection test error:", pingError)
+      }
+      
+      // Proceed with signup
       const { error, data } = await supabase.auth.signUp({ 
         email, 
         password,
@@ -107,7 +122,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
     } catch (error) {
       console.error("Signup process error:", error)
-      throw error
+      
+      // Handle network errors specifically
+      if (error instanceof Error) {
+        const errorMessage = error.message || "Unknown error";
+        const isNetworkError = 
+          errorMessage.includes("fetch") || 
+          errorMessage.includes("network") ||
+          errorMessage.includes("Failed to fetch");
+          
+        toast({
+          title: "Sign up failed",
+          description: isNetworkError 
+            ? "Network error. Please check your internet connection and try again." 
+            : errorMessage,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Sign up failed",
+          description: "An unexpected error occurred",
+          variant: "destructive"
+        });
+      }
+      
+      throw error;
     }
   }
 

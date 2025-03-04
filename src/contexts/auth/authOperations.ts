@@ -1,81 +1,12 @@
 
-import { createContext, useContext, useEffect, useState } from 'react'
-import { User, Provider } from '@supabase/supabase-js'
+import { Provider } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
 
-type AuthContextType = {
-  user: User | null
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string) => Promise<void>
-  signInWithProvider: (provider: Provider) => Promise<void>
-  signOut: () => Promise<void>
-  loading: boolean
-  isConnected: boolean
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [isConnected, setIsConnected] = useState(false)
+export function useAuthOperations() {
   const { toast } = useToast()
 
-  // Setup a connection check every minute
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        const { error } = await supabase.auth.getSession()
-        setIsConnected(!error)
-      } catch (e) {
-        setIsConnected(false)
-        console.error("Connection check failed:", e)
-      }
-    }
-    
-    checkConnection()
-    const interval = setInterval(checkConnection, 60000) // Every minute
-    
-    return () => clearInterval(interval)
-  }, [])
-
-  useEffect(() => {
-    // Check active sessions
-    const fetchSession = async () => {
-      try {
-        console.log("Fetching initial session...");
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          console.error("Session fetch error:", error);
-          throw error;
-        }
-        
-        setUser(session?.user ?? null)
-        setIsConnected(true)
-        console.log("Session checked, user:", session?.user?.email || "No user")
-      } catch (error) {
-        console.error("Error fetching session:", error)
-        setIsConnected(false)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchSession()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("Auth state changed:", _event, session?.user?.email || "No user")
-      setUser(session?.user ?? null)
-      setIsConnected(true) // If we get an event, we're connected
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, setIsConnected: (status: boolean) => void) => {
     try {
       console.log("Attempting to sign in with:", email)
       setIsConnected(true) // Optimistically set connected
@@ -131,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, setIsConnected: (status: boolean) => void) => {
     try {
       console.log("Attempting signup with:", email)
       setIsConnected(true) // Optimistically set connected
@@ -212,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signInWithProvider = async (provider: Provider) => {
+  const signInWithProvider = async (provider: Provider, setIsConnected: (status: boolean) => void) => {
     try {
       console.log(`Attempting to sign in with provider: ${provider}`);
       setIsConnected(true) // Optimistically set connected
@@ -254,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signOut = async () => {
+  const signOut = async (setIsConnected: (status: boolean) => void) => {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) {
@@ -286,25 +217,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  return (
-    <AuthContext.Provider value={{ 
-      user, 
-      signIn, 
-      signUp, 
-      signInWithProvider,
-      signOut, 
-      loading,
-      isConnected
-    }}>
-      {children}
-    </AuthContext.Provider>
-  )
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+  return {
+    signIn,
+    signUp,
+    signInWithProvider,
+    signOut
   }
-  return context
 }

@@ -2,7 +2,7 @@
 import { LogIn, User, LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/auth/AuthContext";
 import { AuthModal } from "./auth/AuthModal";
 import {
   DropdownMenu,

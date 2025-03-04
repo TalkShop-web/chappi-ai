@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/auth/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, AlertCircle, Wifi, WifiOff, ServerOff } from 'lucide-react'
 import { checkSupabaseConnection, supabase } from '@/lib/supabase'
@@ -24,17 +23,15 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const { signIn, signUp } = useAuth()
   const { toast } = useToast()
 
-  // Test connection when modal opens, when retry is clicked, or after several seconds of being disconnected
   useEffect(() => {
     if (isOpen) {
       testConnection();
       
-      // Setup periodic retries if disconnected
       const intervalId = setInterval(() => {
         if (connectionStatus === 'disconnected' || connectionStatus === 'partial') {
           testConnection();
         }
-      }, 5000); // Retry every 5 seconds
+      }, 5000);
       
       return () => clearInterval(intervalId);
     }
@@ -59,15 +56,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         setConnectionMessage(result.message || "Connection to our servers failed. Please check your internet connection.");
       }
       
-      // Ping Supabase URL directly as a fallback test
       if (!result.connected) {
         try {
-          const pingResponse = await fetch(supabase.supabaseUrl, { 
+          const response = await fetch(`${window.location.origin}/ping-test`, { 
             method: 'HEAD',
-            mode: 'no-cors', // This allows the request even if the server doesn't support CORS
+            mode: 'no-cors',
             cache: 'no-store'
           });
-          console.log("Ping response status:", pingResponse.status, pingResponse.ok);
+          console.log("Ping test completed");
         } catch (pingError) {
           console.error("Direct ping failed:", pingError);
         }
@@ -106,7 +102,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     } catch (error) {
       console.error('Auth error:', error)
       
-      // Check for network errors
       if (error instanceof Error) {
         const errorMessage = error.message || "Unknown error";
         if (
@@ -189,7 +184,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           <DialogTitle>{isSignUp ? 'Create an account' : 'Sign in'}</DialogTitle>
         </DialogHeader>
         
-        {/* Connection status indicator */}
         {getConnectionUI()}
 
         <form onSubmit={handleSubmit} className="space-y-4">

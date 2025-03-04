@@ -72,7 +72,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       if (isSignUp) {
         console.log(`Attempting to sign up with email: ${email}`)
         const user = await signUp(email, password)
-        if (user) {
+        
+        if (user !== null) {
           toast({
             title: "Account created",
             description: "Please check your email to verify your account.",
@@ -81,7 +82,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         // Don't close modal on signup as verification may be required
       } else {
         const user = await signIn(email, password)
-        if (user) {
+        
+        if (user !== null) {
           onClose()
         }
       }
